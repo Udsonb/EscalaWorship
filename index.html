@@ -2746,27 +2746,60 @@ async function registrarComCodigo() {
   if (!supabase)                  { hideLogin(); seedData(); navigate('dashboard'); return; }
 
   try {
-    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password: senha });
+    // Guarda dados para usar após confirmação de email
+    if (_pendingMinisterioId) {
+      localStorage.setItem('_reg_ministerio_id',   _pendingMinisterioId);
+      localStorage.setItem('_reg_ministerio_nome',  _pendingMinisterioNome || '');
+      localStorage.setItem('_reg_nome',  nome);
+      localStorage.setItem('_reg_email', email);
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email, password: senha,
+      options: { data: { nome }, emailRedirectTo: window.location.origin }
+    });
     if (authError) throw authError;
 
-    if (authData.user && _pendingMinisterioId) {
-      await supabase.from('membros').insert({
-        user_id:       authData.user.id,
-        ministerio_id: _pendingMinisterioId,
-        nome,
-        email,
-        funcao:    '🎤 Vocal',
-        permissao: 'participante',
-        avatar_cor: 'av1'
-      });
-    }
-
     if (authData.session) {
+      // Email confirmation off — entra direto
+      await criarMembroSeNecessario(authData.session.user);
       await afterLogin(authData.session);
     } else {
-      toast('📧 Verifique seu email e confirme o cadastro para entrar!');
+      // Email confirmation on — aguarda clique no link
+      document.getElementById('login-screen').innerHTML = `
+        <div style="text-align:center;padding:40px 20px;max-width:380px;">
+          <div style="font-size:48px;margin-bottom:16px;">📧</div>
+          <h2 style="font-family:'Syne',sans-serif;color:var(--accent2);margin-bottom:12px;">Confirme seu email</h2>
+          <p style="color:var(--text2);font-size:14px;line-height:1.6;">
+            Enviamos um link de confirmação para<br>
+            <strong style="color:var(--text);">${email}</strong><br><br>
+            Clique no link do email para entrar no<br>
+            <strong style="color:var(--accent);">${_pendingMinisterioNome}</strong>
+          </p>
+          <p style="color:var(--muted);font-size:12px;margin-top:16px;">Verifique também a caixa de spam.</p>
+        </div>`;
     }
   } catch(e) { toast('❌ ' + e.message); }
+}
+
+async function criarMembroSeNecessario(user) {
+  const minId = localStorage.getItem('_reg_ministerio_id');
+  const nome  = localStorage.getItem('_reg_nome') || user.user_metadata?.nome || 'Membro';
+  const email = localStorage.getItem('_reg_email') || user.email || '';
+  if (!minId || !supabase) return;
+  try {
+    const { data: existing } = await supabase.from('membros').select('id').eq('user_id', user.id).single();
+    if (!existing) {
+      await supabase.from('membros').insert({
+        user_id: user.id, ministerio_id: minId,
+        nome, email, funcao: '🎤 Vocal', permissao: 'participante', avatar_cor: 'av1'
+      });
+    }
+    localStorage.removeItem('_reg_ministerio_id');
+    localStorage.removeItem('_reg_ministerio_nome');
+    localStorage.removeItem('_reg_nome');
+    localStorage.removeItem('_reg_email');
+  } catch(e) { console.warn('criarMembro:', e); }
 }
 
 // ---- Após login: carrega membro e ministério do Supabase ----
@@ -2783,16 +2816,26 @@ async function afterLogin(session) {
       .single();
 
     if (membro) {
-      // Carrega dados do Supabase no DB local (para compatibilidade com o app)
       await syncFromSupabase(membro);
       hideLogin();
       navigate('dashboard');
     } else {
-      // Membro novo — vai para tela de seleção de ministério
-      hideLogin();
-      toast('👋 Bem-vindo! Entre com um código de convite ou crie um novo ministério.');
-      openModal('modal-invite');
-      navigate('dashboard');
+      // Tenta criar membro automaticamente se tiver dados pendentes do registro
+      await criarMembroSeNecessario(session.user);
+      // Busca de novo
+      const { data: membroNovo } = await supabase.from('membros')
+        .select('*, ministerios(*)')
+        .eq('user_id', session.user.id)
+        .single();
+      if (membroNovo) {
+        await syncFromSupabase(membroNovo);
+        hideLogin();
+        navigate('dashboard');
+      } else {
+        hideLogin();
+        toast('👋 Bem-vindo! Digite um código de convite para entrar no seu ministério.');
+        navigate('dashboard');
+      }
     }
   } catch(e) {
     console.error(e);
