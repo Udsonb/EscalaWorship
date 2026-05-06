@@ -1,0 +1,2998 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d111a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EscalaWorship">
+<meta name="description" content="Gestão de ministério de louvor">
+<link rel="manifest" href="manifest.json">
+<title>EscalaWorship</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS & RESET
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0d111a;
+  --surface:  #111620;
+  --surface2: #181d2a;
+  --surface3: #1f2535;
+  --border:   #252b3d;
+  --border2:  #2f3750;
+  --accent:   #c9a76a;
+  --accent2:  #dfc08a;
+  --accent3:  #edd9a8;
+  --gold:     #c9a76a;
+  --goldd:    #b8943e;
+  --green:    #34d399;
+  --greend:   #10b981;
+  --red:      #f87171;
+  --redd:     #ef4444;
+  --blue:     #60a5fa;
+  --navy:     #2b3a52;
+  --navyd:    #1e2a3d;
+  --text:     #eaecf4;
+  --text2:    #b0b5cc;
+  --muted:    #636880;
+  --r:        14px;
+  --r-sm:     10px;
+  --sidebar:  240px;
+}
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.sidebar {
+  width: var(--sidebar);
+  min-height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px 24px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  transition: transform 0.25s ease;
+  z-index: 50;
+}
+
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.topbar h1 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; flex: 1; }
+
+.content { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* ============================================================
+   SIDEBAR ELEMENTS
+   ============================================================ */
+.logo {
+  padding: 4px 10px 18px;
+  display: flex;
+  justify-content: center;
+}
+
+.logo-icon {
+  width: 130px; height: auto;
+  flex-shrink: 0;
+}
+
+.ministry-card {
+  background: linear-gradient(135deg, rgba(201,167,106,0.18), rgba(201,167,106,0.06));
+  border: 1px solid rgba(201,167,106,0.3);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ministry-card:hover { border-color: var(--accent); }
+.ministry-card .min-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; }
+.ministry-card .min-role { font-size: 11px; color: var(--gold); font-weight: 600; margin-top: 2px; }
+
+.nav-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  color: var(--muted);
+  padding: 12px 10px 4px;
+  text-transform: uppercase;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text2);
+  transition: all 0.12s;
+  user-select: none;
+}
+
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+
+.nav-item.active {
+  background: rgba(201,167,106,0.14);
+  color: var(--accent2);
+  font-weight: 600;
+}
+
+.nav-item .ni { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+
+.nbadge {
+  margin-left: auto;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+/* ============================================================
+   VIEWS
+   ============================================================ */
+.view { display: none; animation: fadeIn 0.18s ease; }
+.view.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.12s;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn:active { transform: scale(0.97); }
+
+.btn-primary { background: linear-gradient(135deg, var(--accent), #b8943e); color: #fff; box-shadow: 0 4px 14px rgba(201,167,106,0.3); }
+.btn-primary:hover { opacity: 0.9; }
+
+.btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--text2); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent2); background: rgba(201,167,106,0.07); }
+
+.btn-success { background: rgba(52,211,153,0.13); color: var(--green); border: 1px solid rgba(52,211,153,0.28); }
+.btn-success:hover { background: rgba(52,211,153,0.2); }
+
+.btn-danger { background: rgba(248,113,113,0.1); color: var(--red); border: 1px solid rgba(248,113,113,0.25); }
+.btn-danger:hover { background: rgba(248,113,113,0.18); }
+
+.btn-gold { background: rgba(240,192,64,0.12); color: var(--gold); border: 1px solid rgba(240,192,64,0.28); }
+.btn-gold:hover { background: rgba(240,192,64,0.2); }
+
+.btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 8px; }
+.btn-xs { padding: 3px 9px; font-size: 11px; border-radius: 6px; }
+
+.icon-btn {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover { border-color: var(--accent); background: rgba(201,167,106,0.1); }
+
+/* ============================================================
+   CARDS & LAYOUT PRIMITIVES
+   ============================================================ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-header h3 { font-family: 'Syne', sans-serif; font-size: 14.5px; font-weight: 700; }
+.card-body { padding: 16px 18px; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+.mb16 { margin-bottom: 16px; }
+.mb20 { margin-bottom: 20px; }
+.mb24 { margin-bottom: 24px; }
+
+/* ============================================================
+   STAT CARD
+   ============================================================ */
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+
+.sc1::before { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+.sc2::before { background: linear-gradient(90deg, var(--gold), #f97316); }
+.sc3::before { background: linear-gradient(90deg, var(--green), var(--greend)); }
+.sc4::before { background: linear-gradient(90deg, var(--red), var(--redd)); }
+
+.stat-icon { font-size: 22px; margin-bottom: 8px; }
+.stat-value { font-family: 'Syne', sans-serif; font-size: 30px; font-weight: 800; line-height: 1; }
+.stat-label { font-size: 11.5px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+/* ============================================================
+   TAGS & STATUS
+   ============================================================ */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 20px;
+  white-space: nowrap;
+}
+
+.tag-purple { background: rgba(201,167,106,0.14); color: var(--accent2); border: 1px solid rgba(201,167,106,0.25); }
+.tag-green  { background: rgba(52,211,153,0.12);  color: var(--green);   border: 1px solid rgba(52,211,153,0.25); }
+.tag-gold   { background: rgba(240,192,64,0.12);  color: var(--gold);    border: 1px solid rgba(240,192,64,0.25); }
+.tag-red    { background: rgba(248,113,113,0.1);  color: var(--red);     border: 1px solid rgba(248,113,113,0.22); }
+.tag-blue   { background: rgba(96,165,250,0.12);  color: var(--blue);    border: 1px solid rgba(96,165,250,0.25); }
+.tag-muted  { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+.confirm-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 20px;
+}
+
+.cp-ok  { background: rgba(52,211,153,0.12);  color: var(--green); }
+.cp-wait{ background: rgba(240,192,64,0.12);  color: var(--gold); }
+.cp-no  { background: rgba(248,113,113,0.1);  color: var(--red); }
+
+/* ============================================================
+   MEMBER ROW
+   ============================================================ */
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.member-row:last-child { border-bottom: none; }
+
+.avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px;
+  flex-shrink: 0;
+}
+
+.av1 { background: rgba(43,58,82,0.6); color: var(--accent2); }
+.av2 { background: rgba(52,211,153,0.18); color: var(--green); }
+.av3 { background: rgba(240,192,64,0.18); color: var(--gold); }
+.av4 { background: rgba(248,113,113,0.14); color: var(--red); }
+.av5 { background: rgba(96,165,250,0.16); color: var(--blue); }
+.av6 { background: rgba(251,146,60,0.16); color: #fdba74; }
+
+.m-info { flex: 1; min-width: 0; }
+.m-info .name { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-info .role { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+
+/* ============================================================
+   ESCALA CARD
+   ============================================================ */
+.escala-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.escala-card:hover { border-color: var(--accent); background: var(--surface2); transform: translateY(-1px); }
+
+.escala-date {
+  min-width: 50px;
+  text-align: center;
+  background: rgba(201,167,106,0.1);
+  border: 1px solid rgba(201,167,106,0.25);
+  border-radius: 10px;
+  padding: 8px 6px;
+  flex-shrink: 0;
+}
+
+.escala-date .eday { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--accent2); line-height: 1; }
+.escala-date .emon { font-size: 9.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px; }
+
+.escala-info { flex: 1; min-width: 0; }
+.escala-info h4 { font-weight: 600; font-size: 14.5px; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.escala-info p { font-size: 11.5px; color: var(--muted); }
+
+.escala-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; flex-shrink: 0; }
+
+/* ============================================================
+   REPERTÓRIO — SLOT
+   ============================================================ */
+.slot-wrap {
+  margin-bottom: 10px;
+  border-radius: var(--r);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.15s;
+}
+
+.slot-wrap:hover { border-color: var(--border2); }
+
+.slot-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+
+.slot-num {
+  width: 26px; height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent), #b8943e);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  flex-shrink: 0;
+}
+
+.slot-special {
+  background: linear-gradient(135deg, var(--gold), #d97706);
+}
+
+.slot-title { font-weight: 600; font-size: 13px; flex: 1; }
+.slot-who { font-size: 11px; color: var(--muted); }
+
+.slot-body { padding: 12px 14px; }
+
+.slot-music {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+
+.slot-music-name { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; }
+.slot-music-artist { font-size: 11.5px; color: var(--muted); }
+
+.tone-badge {
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 7px;
+  padding: 3px 9px;
+  font-size: 11px; font-weight: 700;
+  color: var(--accent3);
+  white-space: nowrap;
+}
+
+.slot-links { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+
+.link-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.12s;
+}
+
+.link-chip:hover { opacity: 0.8; }
+.lc-spotify { background: rgba(30,215,96,0.14); color: #1ed760; border: 1px solid rgba(30,215,96,0.28); }
+.lc-youtube { background: rgba(255,0,0,0.1); color: #ff4040; border: 1px solid rgba(255,0,0,0.22); }
+.lc-cifra   { background: rgba(96,165,250,0.1); color: var(--blue); border: 1px solid rgba(96,165,250,0.22); }
+
+.slot-empty {
+  font-size: 12.5px; color: var(--muted);
+  font-style: italic;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* ============================================================
+   SUGESTÃO
+   ============================================================ */
+.sug-card {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+
+.sug-card.pending  { border-left: 3px solid var(--gold); }
+.sug-card.approved { border-left: 3px solid var(--green); opacity: 0.75; }
+.sug-card.rejected { border-left: 3px solid var(--red); opacity: 0.55; }
+
+.sug-info { flex: 1; min-width: 0; }
+.sug-title { font-weight: 600; font-size: 13.5px; }
+.sug-meta  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.sug-actions { display: flex; gap: 5px; flex-shrink: 0; align-items: flex-start; }
+
+/* ============================================================
+   INDISPONIBILIDADE
+   ============================================================ */
+.indisp-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 12px;
+}
+
+.indisp-card .ind-period { font-weight: 600; font-size: 13px; }
+.indisp-card .ind-reason { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+/* ============================================================
+   CHAT
+   ============================================================ */
+.chat-wrap {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 180px);
+  max-width: 700px;
+}
+
+.chat-msgs {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+}
+
+.chat-msg { display: flex; gap: 8px; align-items: flex-end; }
+.chat-msg.mine { flex-direction: row-reverse; }
+
+.chat-bubble {
+  max-width: 74%;
+  padding: 9px 13px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chat-msg.other .chat-bubble { background: var(--surface2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.chat-msg.mine  .chat-bubble { background: rgba(201,167,106,0.18); border: 1px solid rgba(201,167,106,0.3); border-bottom-right-radius: 4px; }
+
+.chat-time { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+.chat-av { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+
+.chat-input-row {
+  display: flex; gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* ============================================================
+   CALENDÁRIO
+   ============================================================ */
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.cal-month-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; }
+
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+
+.cal-dh {
+  text-align: center;
+  font-size: 10px; font-weight: 700;
+  color: var(--muted);
+  padding: 5px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cal-day {
+  aspect-ratio: 1;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 0.1s;
+  position: relative;
+}
+
+.cal-day:hover:not(.empty) { background: var(--surface2); }
+.cal-day.empty { cursor: default; }
+
+.cal-day.today {
+  background: rgba(201,167,106,0.18);
+  color: var(--accent2);
+  font-weight: 700;
+  border: 1px solid rgba(201,167,106,0.4);
+}
+
+.cal-day.has-event::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.cal-day.unavailable {
+  background: rgba(248,113,113,0.08);
+  color: var(--red);
+  opacity: 0.7;
+}
+
+/* ============================================================
+   FORM
+   ============================================================ */
+.form-group { margin-bottom: 14px; }
+.form-label {
+  font-size: 11.5px; font-weight: 600; color: var(--text2);
+  margin-bottom: 5px; display: block; letter-spacing: 0.2px;
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201,167,106,0.12);
+}
+
+.form-select option { background: var(--surface2); }
+.form-textarea { resize: vertical; min-height: 80px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+  padding: 16px;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 18px;
+  width: 580px;
+  max-width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  animation: modalIn 0.2s cubic-bezier(.32,1.2,.68,1);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+.modal-header {
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+
+.modal-header h2 { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; }
+.modal-body { padding: 18px 22px; }
+.modal-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: 8px;
+  position: sticky; bottom: 0; background: var(--surface);
+}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+.tabs {
+  display: flex; gap: 4px;
+  background: var(--surface2);
+  border-radius: var(--r-sm);
+  padding: 3px;
+  margin-bottom: 18px;
+}
+
+.tab-btn {
+  flex: 1; padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 12.5px; font-weight: 600;
+  cursor: pointer; border: none;
+  background: transparent;
+  color: var(--muted);
+  transition: all 0.12s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.tab-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+
+/* ============================================================
+   AVISO
+   ============================================================ */
+.aviso-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 14px;
+  margin-bottom: 8px;
+  border-left: 3px solid var(--accent);
+}
+
+.aviso-card.urg  { border-left-color: var(--red); }
+.aviso-card.info { border-left-color: var(--green); }
+.aviso-card h4 { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
+.aviso-card p  { font-size: 12.5px; color: var(--text2); line-height: 1.5; }
+.aviso-card .av-meta { font-size: 10.5px; color: var(--muted); margin-top: 7px; }
+
+/* ============================================================
+   SECTION TITLE
+   ============================================================ */
+.sec-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 12.5px; font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px; margin-top: 22px;
+}
+
+.sec-title:first-child { margin-top: 0; }
+
+/* ============================================================
+   DRAG HANDLE
+   ============================================================ */
+.drag-handle {
+  cursor: grab; color: var(--muted); font-size: 16px;
+  padding: 0 4px;
+  user-select: none;
+}
+
+.drag-handle:active { cursor: grabbing; }
+
+/* ============================================================
+   INSTALL BANNER
+   ============================================================ */
+#install-banner {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(135deg, var(--accent), #b8943e);
+  padding: 12px 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  z-index: 999;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: none; } }
+
+#install-banner p { font-size: 13px; font-weight: 600; color: #fff; }
+#install-banner small { font-size: 11px; color: rgba(255,255,255,0.7); display: block; }
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+.hamburger {
+  display: none;
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 16px;
+  align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 30px rgba(0,0,0,0.5);
+  }
+
+  .sidebar.open { transform: translateX(0); }
+
+  .hamburger { display: flex; }
+
+  .grid4 { grid-template-columns: repeat(2, 1fr); }
+  .grid2 { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .form-row3 { grid-template-columns: 1fr 1fr; }
+
+  .content { padding: 16px; }
+  .topbar { padding: 12px 16px; }
+
+  .modal { border-radius: 16px 16px 0 0; position: fixed; bottom: 0; left: 0; right: 0; width: 100%; max-height: 95vh; }
+  .modal-overlay { align-items: flex-end; padding: 0; }
+}
+
+.overlay-bg {
+  display: none;
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 49;
+}
+
+.overlay-bg.open { display: block; }
+
+/* ============================================================
+   MISC UTILITIES
+   ============================================================ */
+.flex-row { display: flex; align-items: center; gap: 10px; }
+.flex-wrap { flex-wrap: wrap; }
+.divider { height: 1px; background: var(--border); margin: 14px 0; }
+.text-muted { color: var(--muted); }
+.text-sm { font-size: 12px; }
+.empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+.empty-state .ei { font-size: 40px; margin-bottom: 10px; }
+.empty-state h3 { font-family: 'Syne', sans-serif; font-size: 15px; color: var(--text2); margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<!-- OVERLAY (mobile) -->
+<div class="overlay-bg" id="overlay-bg" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="logo">
+    <div class="logo-icon">
+      <img src="logo.png" alt="EscalaWorship" style="width:130px;height:auto;object-fit:contain;filter:brightness(1.05);">
+    </div>
+  </div>
+
+  <div class="ministry-card" onclick="navigate('ministerio')">
+    <div class="min-name">Igreja Vida Nova</div>
+    <div class="min-role">⭐ Líder / Administrador</div>
+  </div>
+
+  <div class="nav-label">Principal</div>
+  <div class="nav-item active" data-nav="dashboard" onclick="navigate('dashboard')">
+    <span class="ni">🏠</span> Início
+  </div>
+  <div class="nav-item" data-nav="escalas" onclick="navigate('escalas')">
+    <span class="ni">📋</span> Escalas
+    <span class="nbadge">3</span>
+  </div>
+  <div class="nav-item" data-nav="agenda" onclick="navigate('agenda')">
+    <span class="ni">📅</span> Agenda
+  </div>
+
+  <div class="nav-label">Ministério</div>
+  <div class="nav-item" data-nav="membros" onclick="navigate('membros')">
+    <span class="ni">👥</span> Membros
+  </div>
+  <div class="nav-item" data-nav="musicas" onclick="navigate('musicas')">
+    <span class="ni">🎵</span> Repertório
+  </div>
+  <div class="nav-item" data-nav="avisos" onclick="navigate('avisos')">
+    <span class="ni">🔔</span> Avisos
+    <span class="nbadge">2</span>
+  </div>
+  <div class="nav-item" data-nav="chat" onclick="navigate('chat')">
+    <span class="ni">💬</span> Chat
+  </div>
+
+  <div class="nav-label">Gestão</div>
+  <div class="nav-item" data-nav="relatorios" onclick="navigate('relatorios')">
+    <span class="ni">📊</span> Relatórios
+  </div>
+  <div class="nav-item" data-nav="ministerio" onclick="navigate('ministerio')">
+    <span class="ni">⚙️</span> Ministério
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="hamburger" onclick="toggleSidebar()">☰</div>
+    <h1 id="page-title">Início</h1>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+      <button class="btn btn-ghost btn-sm" onclick="openModal('modal-invite')">🔗 Convidar</button>
+      <button class="btn btn-primary btn-sm" id="main-action" onclick="handleMainAction()">+ Nova Escala</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- ==================== DASHBOARD ==================== -->
+    <div class="view active" id="view-dashboard">
+      <div class="grid4 mb20">
+        <div class="stat-card sc1"><div class="stat-icon">📋</div><div class="stat-value">3</div><div class="stat-label">Escalas este mês</div></div>
+        <div class="stat-card sc2"><div class="stat-icon">👥</div><div class="stat-value">12</div><div class="stat-label">Membros ativos</div></div>
+        <div class="stat-card sc3"><div class="stat-icon">🎵</div><div class="stat-value">47</div><div class="stat-label">Músicas no repertório</div></div>
+        <div class="stat-card sc4"><div class="stat-icon">⏳</div><div class="stat-value">5</div><div class="stat-label">Confirmações pendentes</div></div>
+      </div>
+
+      <div class="grid2 mb20">
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Próximas Escalas</h3>
+            <button class="btn btn-ghost btn-sm" onclick="navigate('escalas')">Ver todas</button>
+          </div>
+          <div class="card-body" id="dash-escalas"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>✅ Confirmações</h3>
+            <button class="btn btn-ghost btn-sm" onclick="navigate('membros')">Membros</button>
+          </div>
+          <div class="card-body" id="dash-confirms"></div>
+        </div>
+      </div>
+
+      <div class="card mb20">
+        <div class="card-header">
+          <h3>🔔 Últimos Avisos</h3>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('avisos')">Ver todos</button>
+        </div>
+        <div class="card-body" id="dash-avisos"></div>
+      </div>
+
+      <!-- Google Agenda sync banner -->
+      <div style="background:linear-gradient(135deg,rgba(96,165,250,0.12),rgba(201,167,106,0.08));border:1px solid rgba(96,165,250,0.2);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="font-size:26px;">📅</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;">Sincronize com o Google Agenda</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Suas escalas aparecem automaticamente no calendário</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="syncGoogle()">Conectar Google</button>
+      </div>
+    </div>
+
+    <!-- ==================== ESCALAS ==================== -->
+    <div class="view" id="view-escalas">
+      <div class="flex-row flex-wrap mb16">
+        <button class="btn btn-ghost btn-sm filt active-filt" onclick="filterEsc(this,'todas')">Todas</button>
+        <button class="btn btn-ghost btn-sm filt" onclick="filterEsc(this,'publicada')">Publicadas</button>
+        <button class="btn btn-ghost btn-sm filt" onclick="filterEsc(this,'rascunho')">Rascunhos</button>
+        <button class="btn btn-ghost btn-sm filt" onclick="filterEsc(this,'passadas')">Passadas</button>
+      </div>
+      <div id="escalas-list"></div>
+    </div>
+
+    <!-- ==================== DETALHE ESCALA ==================== -->
+    <div class="view" id="view-escala-detail">
+      <div class="flex-row mb20" style="flex-wrap:wrap;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="navigate('escalas')">← Voltar</button>
+        <h2 id="esc-detail-name" style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;flex:1;"></h2>
+        <span id="esc-detail-info" class="tag tag-muted"></span>
+        <button class="btn btn-gold btn-sm" onclick="publishEscala()">📢 Publicar</button>
+      </div>
+
+      <div class="grid2 mb20">
+        <!-- Membros escalados -->
+        <div class="card">
+          <div class="card-header">
+            <h3>👥 Membros Escalados</h3>
+            <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-membro-escala')">+ Adicionar</button>
+          </div>
+          <div class="card-body" id="esc-membros"></div>
+        </div>
+
+        <!-- Info -->
+        <div>
+          <div class="card mb16">
+            <div class="card-header"><h3>📋 Detalhes</h3></div>
+            <div class="card-body">
+              <div class="flex-row" style="margin-bottom:10px;">
+                <span style="font-size:12px;color:var(--muted);min-width:80px;">Data</span>
+                <span id="esc-detail-data" style="font-weight:600;font-size:13px;"></span>
+              </div>
+              <div class="flex-row" style="margin-bottom:10px;">
+                <span style="font-size:12px;color:var(--muted);min-width:80px;">Horário</span>
+                <span id="esc-detail-hora" style="font-weight:600;font-size:13px;"></span>
+              </div>
+              <div class="flex-row">
+                <span style="font-size:12px;color:var(--muted);min-width:80px;">Status</span>
+                <span id="esc-detail-status"></span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>📊 Confirmações</h3></div>
+            <div class="card-body" id="esc-confirm-summary"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Repertório da Escala -->
+      <div class="card mb16">
+        <div class="card-header">
+          <h3>🎵 Repertório da Escala</h3>
+          <span class="tag tag-muted text-sm" id="esc-slots-count"></span>
+        </div>
+        <div class="card-body">
+          <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab(this,'tab-slots')">📋 Setlist</button>
+            <button class="tab-btn" onclick="switchTab(this,'tab-sugestoes')">💡 Sugestões</button>
+          </div>
+
+          <!-- SETLIST -->
+          <div id="tab-slots">
+            <div id="slots-list"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addSlot()" style="margin-top:8px;">+ Adicionar posição</button>
+          </div>
+
+          <!-- SUGESTÕES -->
+          <div id="tab-sugestoes" style="display:none;">
+            <div style="margin-bottom:14px;padding:12px;background:rgba(240,192,64,0.07);border:1px solid rgba(240,192,64,0.2);border-radius:var(--r-sm);">
+              <div style="font-size:12.5px;font-weight:600;margin-bottom:8px;color:var(--gold);">💡 Sugerir uma música</div>
+              <div class="form-row" style="margin-bottom:8px;">
+                <input class="form-input" id="sug-name" placeholder="Nome ou link da música">
+                <input class="form-input" id="sug-artist" placeholder="Artista (opcional)">
+              </div>
+              <button class="btn btn-gold btn-sm" onclick="addSugestao()">Enviar sugestão</button>
+            </div>
+            <div id="sugestoes-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MEMBROS ==================== -->
+    <div class="view" id="view-membros">
+      <div class="card mb16">
+        <div class="card-header">
+          <h3 id="membros-count">Todos os Membros</h3>
+          <input class="form-input" id="busca-membro" placeholder="🔍 Buscar..." style="width:180px;padding:6px 11px;font-size:12.5px;" oninput="renderMembros()">
+        </div>
+        <div class="card-body" id="membros-list"></div>
+      </div>
+    </div>
+
+    <!-- ==================== DETALHE MEMBRO ==================== -->
+    <div class="view" id="view-membro-detail">
+      <button class="btn btn-ghost btn-sm mb16" onclick="navigate('membros')">← Voltar</button>
+      <div class="grid2">
+        <div>
+          <div class="card mb16">
+            <div class="card-header"><h3 id="md-name">Membro</h3></div>
+            <div class="card-body" id="md-info"></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h3>🚫 Indisponibilidades</h3>
+              <button class="btn btn-danger btn-sm" onclick="openModal('modal-indisp')">+ Declarar</button>
+            </div>
+            <div class="card-body" id="md-indisps"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MÚSICAS ==================== -->
+    <div class="view" id="view-musicas">
+      <div class="flex-row flex-wrap mb16">
+        <input class="form-input" id="busca-musica" placeholder="🔍 Buscar música..." style="flex:1;max-width:300px;padding:7px 12px;font-size:13px;" oninput="renderMusicas()">
+        <select class="form-select" style="width:auto;padding:7px 12px;font-size:12.5px;" onchange="renderMusicas()">
+          <option>Todas as pastas</option>
+          <option>Adoração</option>
+          <option>Louvor</option>
+          <option>Especiais</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3 id="musicas-count">Repertório</h3></div>
+        <div class="card-body" id="musicas-list"></div>
+      </div>
+    </div>
+
+    <!-- ==================== AVISOS ==================== -->
+    <div class="view" id="view-avisos">
+      <div id="avisos-list"></div>
+    </div>
+
+    <!-- ==================== CHAT ==================== -->
+    <div class="view" id="view-chat">
+      <div class="card chat-wrap">
+        <div class="card-header">
+          <h3>💬 Chat do Ministério</h3>
+          <span class="tag tag-green">● Online</span>
+        </div>
+        <div class="chat-msgs" id="chat-msgs"></div>
+        <div class="chat-input-row">
+          <input class="form-input" id="chat-input" placeholder="Escreva uma mensagem..." onkeypress="if(event.key==='Enter')sendMsg()">
+          <button class="btn btn-primary btn-sm" onclick="sendMsg()">Enviar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== AGENDA ==================== -->
+    <div class="view" id="view-agenda">
+      <div class="grid2">
+        <div>
+          <div class="card mb16">
+            <div class="card-header">
+              <button class="btn btn-ghost btn-sm" onclick="changeMonth(-1)">◀</button>
+              <h3 id="cal-title" style="flex:1;text-align:center;"></h3>
+              <button class="btn btn-ghost btn-sm" onclick="changeMonth(1)">▶</button>
+            </div>
+            <div class="card-body">
+              <div class="cal-grid mb16" id="cal-headers"></div>
+              <div class="cal-grid" id="cal-days"></div>
+            </div>
+          </div>
+          <!-- Google sync -->
+          <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.18);border-radius:var(--r);padding:14px;text-align:center;">
+            <div style="font-size:22px;margin-bottom:6px;">📅</div>
+            <div style="font-weight:600;font-size:13px;margin-bottom:3px;">Google Agenda</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Sincronize suas escalas com o calendário</div>
+            <button class="btn btn-ghost btn-sm" onclick="syncGoogle()" style="width:100%;">Conectar conta Google</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card-header"><h3>📋 Eventos do Mês</h3></div>
+            <div class="card-body" id="cal-events"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== RELATÓRIOS ==================== -->
+    <div class="view" id="view-relatorios">
+      <div class="grid4 mb20">
+        <div class="stat-card sc1"><div class="stat-icon">📋</div><div class="stat-value">18</div><div class="stat-label">Escalas este ano</div></div>
+        <div class="stat-card sc2"><div class="stat-icon">✅</div><div class="stat-value">94%</div><div class="stat-label">Taxa de confirmação</div></div>
+        <div class="stat-card sc3"><div class="stat-icon">🎵</div><div class="stat-value">47</div><div class="stat-label">Músicas ativas</div></div>
+        <div class="stat-card sc4"><div class="stat-icon">❌</div><div class="stat-value">3</div><div class="stat-label">Faltas registradas</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-header"><h3>🏆 Membros mais escalados</h3></div>
+          <div class="card-body">
+            <div class="member-row"><div class="avatar av1">RB</div><div class="m-info"><div class="name">Ricardo Barbosa</div><div class="role">Guitarra</div></div><span class="tag tag-purple">14×</span></div>
+            <div class="member-row"><div class="avatar av2">CM</div><div class="m-info"><div class="name">Carla Menezes</div><div class="role">Vocal</div></div><span class="tag tag-purple">13×</span></div>
+            <div class="member-row"><div class="avatar av3">TS</div><div class="m-info"><div class="name">Thiago Santos</div><div class="role">Bateria</div></div><span class="tag tag-purple">12×</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>🎵 Músicas mais tocadas</h3></div>
+          <div class="card-body">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+              <div style="width:28px;height:28px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);">1</div>
+              <div style="flex:1;"><div style="font-weight:600;font-size:13px;">Oceans</div><div style="font-size:11px;color:var(--muted);">Hillsong</div></div>
+              <span class="tag tag-gold">8×</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+              <div style="width:28px;height:28px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);">2</div>
+              <div style="flex:1;"><div style="font-weight:600;font-size:13px;">Way Maker</div><div style="font-size:11px;color:var(--muted);">Sinach</div></div>
+              <span class="tag tag-gold">6×</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;">
+              <div style="width:28px;height:28px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);">3</div>
+              <div style="flex:1;"><div style="font-weight:600;font-size:13px;">Goodness of God</div><div style="font-size:11px;color:var(--muted);">Bethel</div></div>
+              <span class="tag tag-gold">5×</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MINISTÉRIO ==================== -->
+    <div class="view" id="view-ministerio">
+      <div class="card" style="max-width:600px;">
+        <div class="card-header"><h3>⚙️ Configurações do Ministério</h3></div>
+        <div class="card-body">
+          <div class="form-group"><label class="form-label">Nome do Ministério</label><input class="form-input" value="Igreja Vida Nova"></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Tipo</label><select class="form-select"><option>Louvor</option><option>Multimídia</option><option>Dança</option></select></div>
+            <div class="form-group"><label class="form-label">Plano</label><select class="form-select"><option>Gratuito</option><option>Pro</option><option>Premium</option></select></div>
+          </div>
+          <div class="sec-title">Funções cadastradas</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;" id="funcoes-list"></div>
+          <button class="btn btn-primary" onclick="toast('✅ Salvo!')">Salvar alterações</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ================================================================
+     MODAIS
+================================================================ -->
+
+<!-- Modal Nova Escala -->
+<div class="modal-overlay" id="modal-escala">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📋 Nova Escala</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-escala')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Título do evento *</label><input class="form-input" id="ne-titulo" placeholder="Ex: Culto Domingo Manhã"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Data *</label><input class="form-input" id="ne-data" type="date"></div>
+        <div class="form-group"><label class="form-label">Horário *</label><input class="form-input" id="ne-hora" type="time" value="09:00"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status inicial</label>
+        <select class="form-select" id="ne-status">
+          <option value="rascunho">🗒 Rascunho (visível só para gestores)</option>
+          <option value="planejada">📌 Planejada</option>
+          <option value="publicada">✅ Publicada</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label><textarea class="form-textarea" id="ne-obs" placeholder="Instruções para os membros..."></textarea></div>
+      <div class="form-group"><label class="form-label">🎧 Playlist do dia (opcional)</label><input class="form-input" id="ne-playlist" placeholder="https://open.spotify.com/playlist/..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-escala')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createEscala()">Criar Escala</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Adicionar/Editar Slot -->
+<div class="modal-overlay" id="modal-slot">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-slot-title">🎵 Escolher Música</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-slot')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px;padding:10px 14px;background:rgba(201,167,106,0.08);border:1px solid rgba(124,92,252,0.2);border-radius:var(--r-sm);font-size:12.5px;color:var(--text2);">
+        💡 Digite o nome da música ou cole um link do Spotify/YouTube
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nome da música *</label><input class="form-input" id="slot-name" placeholder="Ex: Oceans - Hillsong"></div>
+        <div class="form-group"><label class="form-label">Artista / Ministério</label><input class="form-input" id="slot-artist" placeholder="Ex: Hillsong United"></div>
+      </div>
+      <div class="form-row3">
+        <div class="form-group">
+          <label class="form-label">Tom (cifra + nome)</label>
+          <select class="form-select" id="slot-tom">
+            <option value="">— selecione —</option>
+            <option value="C - DO">C - DO</option>
+            <option value="C# - DO#">C# - DO#</option>
+            <option value="D - RE">D - RE</option>
+            <option value="D# - RE#">D# - RE#</option>
+            <option value="E - MI">E - MI</option>
+            <option value="F - FA">F - FA</option>
+            <option value="F# - FA#">F# - FA#</option>
+            <option value="G - SOL">G - SOL</option>
+            <option value="G# - SOL#">G# - SOL#</option>
+            <option value="A - LA">A - LA</option>
+            <option value="A# - LA#">A# - LA#</option>
+            <option value="B - SI">B - SI</option>
+            <option value="Am - LAm">Am - LAm</option>
+            <option value="Bm - SIm">Bm - SIm</option>
+            <option value="Dm - REm">Dm - REm</option>
+            <option value="Em - MIm">Em - MIm</option>
+            <option value="Gm - SOLm">Gm - SOLm</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">BPM</label><input class="form-input" id="slot-bpm" type="number" placeholder="Ex: 72"></div>
+        <div class="form-group">
+          <label class="form-label">Tipo especial</label>
+          <select class="form-select" id="slot-tipo">
+            <option value="">Normal</option>
+            <option value="ofertorio">💰 Ofertório</option>
+            <option value="santa-ceia">✝️ Santa Ceia</option>
+            <option value="abertura">🌅 Abertura</option>
+            <option value="encerramento">🌙 Encerramento</option>
+          </select>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="form-group">
+        <label class="form-label">🎧 Link Spotify</label>
+        <input class="form-input" id="slot-spotify" placeholder="https://open.spotify.com/track/...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">▶️ Link YouTube</label>
+        <input class="form-input" id="slot-youtube" placeholder="https://youtube.com/watch?v=...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">🎸 Link Cifra</label>
+        <input class="form-input" id="slot-cifra" placeholder="https://cifraclub.com.br/...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-slot')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSlot()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nova Música (Repertório Global) -->
+<div class="modal-overlay" id="modal-musica">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🎵 Adicionar ao Repertório</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-musica')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Título *</label><input class="form-input" id="nm-titulo" placeholder="Nome da música"></div>
+        <div class="form-group"><label class="form-label">Artista / Ministério</label><input class="form-input" id="nm-artista" placeholder="Ex: Hillsong"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tom principal</label>
+          <select class="form-select" id="nm-tom">
+            <option value="">— selecione —</option>
+            <option>C - DO</option><option>D - RE</option><option>E - MI</option><option>F - FA</option>
+            <option>G - SOL</option><option>A - LA</option><option>B - SI</option>
+            <option>Am - LAm</option><option>Dm - REm</option><option>Em - MIm</option><option>Gm - SOLm</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">BPM</label><input class="form-input" id="nm-bpm" type="number" placeholder="72"></div>
+      </div>
+      <div class="form-group"><label class="form-label">🎧 Link Spotify</label><input class="form-input" id="nm-spotify" placeholder="https://open.spotify.com/track/..."></div>
+      <div class="form-group"><label class="form-label">▶️ Link YouTube</label><input class="form-input" id="nm-youtube" placeholder="https://youtube.com/..."></div>
+      <div class="form-group"><label class="form-label">🎸 Link Cifra</label><input class="form-input" id="nm-cifra" placeholder="https://cifraclub.com.br/..."></div>
+      <div class="form-group">
+        <label class="form-label">Pasta</label>
+        <select class="form-select" id="nm-pasta"><option>Adoração</option><option>Louvor</option><option>Especiais</option><option>Sem pasta</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-musica')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveMusica()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Novo Membro -->
+<div class="modal-overlay" id="modal-membro">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>👤 Novo Membro</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-membro')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nome completo *</label><input class="form-input" id="nm2-nome" placeholder="Nome do membro"></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="nm2-email" type="email" placeholder="email@exemplo.com"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Telefone</label>
+        <input class="form-input" id="nm2-tel" placeholder="(85) 9 0000-0000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Funções (pode marcar mais de uma)</label>
+        <div id="nm2-funcoes" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Permissão</label>
+        <select class="form-select" id="nm2-perm"><option value="participante">Participante</option><option value="editor">Editor</option><option value="admin">Administrador</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-membro')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveMembro()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Indisponibilidade -->
+<div class="modal-overlay" id="modal-indisp">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🚫 Declarar Indisponibilidade</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-indisp')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px;padding:10px 14px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:var(--r-sm);font-size:12.5px;color:var(--text2);">
+        ⚠️ Neste período, você não será incluído em nenhuma escala automaticamente.
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Data inicial *</label><input class="form-input" id="ind-inicio" type="date"></div>
+        <div class="form-group"><label class="form-label">Data final *</label><input class="form-input" id="ind-fim" type="date"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo</label>
+        <select class="form-select" id="ind-tipo">
+          <option value="viagem">✈️ Viagem</option>
+          <option value="saude">🏥 Saúde</option>
+          <option value="trabalho">💼 Trabalho</option>
+          <option value="ferias">🏖️ Férias</option>
+          <option value="outro">📋 Outro</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Motivo (visível só para admin)</label><textarea class="form-textarea" id="ind-motivo" placeholder="Descreva o motivo..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-indisp')">Cancelar</button>
+      <button class="btn btn-danger" onclick="saveIndisp()">Declarar Indisponibilidade</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Novo Aviso -->
+<div class="modal-overlay" id="modal-aviso">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🔔 Novo Aviso</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-aviso')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Título *</label><input class="form-input" id="nav-titulo" placeholder="Título do aviso"></div>
+      <div class="form-group"><label class="form-label">Mensagem *</label><textarea class="form-textarea" id="nav-msg" style="min-height:100px;" placeholder="Escreva o aviso..."></textarea></div>
+      <div class="form-group">
+        <label class="form-label">Tipo</label>
+        <select class="form-select" id="nav-tipo"><option value="geral">📋 Geral</option><option value="urgente">⚠️ Urgente</option><option value="info">ℹ️ Informação</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-aviso')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveAviso()">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Convite -->
+<div class="modal-overlay" id="modal-invite">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🔗 Convidar para o Ministério</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-invite')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Compartilhe o link ou código para novos membros entrarem no ministério.</p>
+      <div class="form-group">
+        <label class="form-label">Link de convite</label>
+        <div class="flex-row">
+          <input class="form-input" value="https://escalaworship.app/join/VIDANOVA2026" readonly>
+          <button class="btn btn-ghost btn-sm" onclick="copyText('https://escalaworship.app/join/VIDANOVA2026')">📋</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Código de acesso</label>
+        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;letter-spacing:6px;color:var(--accent2);background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center;cursor:pointer;" onclick="copyText('VIDA26')">
+          VIDA26
+        </div>
+        <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px;">Toque para copiar</div>
+      </div>
+      <div class="flex-row" style="justify-content:center;gap:8px;margin-top:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="toast('📱 QR Code gerado!')">📱 QR Code</button>
+        <button class="btn btn-success btn-sm" onclick="shareWhatsApp()">💬 WhatsApp</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-invite')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Adicionar membro à escala -->
+<div class="modal-overlay" id="modal-add-membro-escala">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>👤 Adicionar à Escala</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-add-membro-escala')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-add-membro-escala-list"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-membro-escala')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Install PWA Banner -->
+<div id="install-banner" style="display:none;">
+  <div>
+    <p>Instalar EscalaWorship</p>
+    <small>Adicione à tela inicial como app</small>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-ghost btn-sm" onclick="dismissInstall()">Agora não</button>
+    <button class="btn btn-primary btn-sm" onclick="installApp()">Instalar</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast-container" style="position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;"></div>
+
+<script>
+/* ================================================================
+   DATA STORE (localStorage)
+================================================================ */
+const DB = {
+  get(k, def) { try { return JSON.parse(localStorage.getItem('ew_'+k)) ?? def; } catch{ return def; } },
+  set(k, v)  { localStorage.setItem('ew_'+k, JSON.stringify(v)); },
+};
+
+const FUNCOES_LISTA = [
+  '🎹 Teclado','🎸 Baixo','🎸 Guitarra','🪗 Violão',
+  '🥁 Bateria','🪘 Percussão',
+  '🎤 Vocal 1','🎤 Vocal 2','🎤 Vocal 3','🎤 Vocal 4 / Apoio'
+];
+
+// ---- Seed inicial ----
+function seedData() {
+  if (DB.get('seeded2')) return;
+
+  DB.set('membros', [
+    { id:1, nome:'Ricardo Barbosa',  iniciais:'RB', av:'av1', funcoes:['🎸 Guitarra','🪗 Violão'], email:'rb@email.com', tel:'(85)98001-0001', perm:'admin', status:'ativo', indisps:[] },
+    { id:2, nome:'Carla Menezes',    iniciais:'CM', av:'av2', funcoes:['🎤 Vocal 1'],               email:'cm@email.com', tel:'(85)98001-0002', perm:'participante', status:'ativo', indisps:[] },
+    { id:3, nome:'Thiago Santos',    iniciais:'TS', av:'av3', funcoes:['🥁 Bateria','🪘 Percussão'],email:'ts@email.com', tel:'(85)98001-0003', perm:'participante', status:'ativo', indisps:[] },
+    { id:4, nome:'Lucas Pereira',    iniciais:'LP', av:'av4', funcoes:['🎹 Teclado'],               email:'lp@email.com', tel:'(85)98001-0004', perm:'participante', status:'ativo', indisps:[] },
+    { id:5, nome:'Ana Ferreira',     iniciais:'AF', av:'av5', funcoes:['🎤 Vocal 2','🎤 Vocal 1'],  email:'af@email.com', tel:'(85)98001-0005', perm:'participante', status:'ativo', indisps:[] },
+    { id:6, nome:'Marcos Oliveira',  iniciais:'MO', av:'av6', funcoes:['🎸 Baixo'],                 email:'mo@email.com', tel:'(85)98001-0006', perm:'participante', status:'indisponivel', indisps:[{id:1,inicio:'2026-05-01',fim:'2026-05-31',tipo:'viagem',motivo:'Viagem a trabalho'}] },
+    { id:7, nome:'Juliana Lima',     iniciais:'JL', av:'av1', funcoes:['🎤 Vocal 1','🎤 Vocal 2'],  email:'jl@email.com', tel:'(85)98001-0007', perm:'admin', status:'ativo', indisps:[] },
+    { id:8, nome:'Paulo Vieira',     iniciais:'PV', av:'av2', funcoes:['🎸 Guitarra'],              email:'pv@email.com', tel:'(85)98001-0008', perm:'participante', status:'ativo', indisps:[] },
+  ]);
+
+  DB.set('musicas', [
+    { id:1, titulo:'Oceans (Where Feet May Fail)', artista:'Hillsong United', tom:'Dm - REm', bpm:68, pasta:'Adoração', spotify:'https://open.spotify.com/track/4hVON4gT66skGnRDELEfpn', youtube:'https://youtube.com/watch?v=dy9nwe9_xzw', cifra:'https://www.cifraclub.com.br/hillsong-united/oceans-where-feet-may-fail/' },
+    { id:2, titulo:'Reckless Love',               artista:'Cory Asbury',     tom:'G - SOL',  bpm:76, pasta:'Louvor',   spotify:'', youtube:'https://youtube.com/watch?v=Sc6SSHuZvQE', cifra:'' },
+    { id:3, titulo:'Goodness of God',             artista:'Bethel Music',    tom:'A - LA',   bpm:72, pasta:'Adoração',  spotify:'', youtube:'https://youtube.com/watch?v=XFHLFkKnKGE', cifra:'' },
+    { id:4, titulo:'Way Maker',                   artista:'Sinach',          tom:'C - DO',   bpm:80, pasta:'Louvor',   spotify:'', youtube:'https://youtube.com/watch?v=sR1gIBnH5JU', cifra:'' },
+    { id:5, titulo:'Teu Santo Nome',              artista:'Ministério Zoe',  tom:'E - MI',   bpm:74, pasta:'Adoração',  spotify:'', youtube:'', cifra:'' },
+    { id:6, titulo:'Eterno Deus',                 artista:'Ministério Zoe',  tom:'D - RE',   bpm:86, pasta:'Louvor',   spotify:'', youtube:'', cifra:'' },
+    { id:7, titulo:'Gratidão',                    artista:'Tom Krüger',      tom:'G - SOL',  bpm:78, pasta:'Louvor',   spotify:'', youtube:'', cifra:'' },
+  ]);
+
+  DB.set('escalas', [
+    { id:1, titulo:'Culto Domingo Manhã', data:'2026-06-01', hora:'09:00', status:'publicada', obs:'Ensaio sábado às 18h', playlist:'',
+      membros:[ {id:1,confirm:'confirmado'},{id:2,confirm:'pendente'},{id:3,confirm:'confirmado'},{id:5,confirm:'pendente'},{id:7,confirm:'confirmado'},{id:8,confirm:'recusado'} ],
+      oferta:{ nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', escolhidoPor:null },
+      slots:[
+        { pos:1, nome:'Oceans', artista:'Hillsong United', tom:'Dm - REm', bpm:68, spotify:'https://open.spotify.com/track/4hVON4gT66skGnRDELEfpn', youtube:'https://youtube.com/watch?v=dy9nwe9_xzw', cifra:'', tipo:'', escolhidoPor:1 },
+        { pos:2, nome:'Way Maker', artista:'Sinach', tom:'C - DO', bpm:80, spotify:'', youtube:'https://youtube.com/watch?v=sR1gIBnH5JU', cifra:'', tipo:'', escolhidoPor:7 },
+        { pos:3, nome:'Goodness of God', artista:'Bethel Music', tom:'A - LA', bpm:72, spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:2 },
+        { pos:4, nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:null },
+        { pos:5, nome:'Teu Santo Nome', artista:'Ministério Zoe', tom:'E - MI', bpm:74, spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:3 },
+      ],
+      sugestoes:[
+        { id:1, nome:'Reckless Love', artista:'Cory Asbury', por:2, status:'pending' },
+        { id:2, nome:'Gratidão', artista:'Tom Krüger', por:5, status:'approved', aprovadoPor:1 },
+      ]
+    },
+    { id:2, titulo:'Reunião de Oração', data:'2026-05-21', hora:'19:30', status:'rascunho', obs:'', playlist:'',
+      membros:[ {id:1,confirm:'pendente'},{id:3,confirm:'pendente'},{id:4,confirm:'pendente'},{id:7,confirm:'pendente'} ],
+      oferta:{ nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', escolhidoPor:null },
+      slots:[
+        { pos:1, nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:null },
+        { pos:2, nome:'Eterno Deus', artista:'Ministério Zoe', tom:'D - RE', bpm:86, spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:1 },
+      ],
+      sugestoes:[]
+    },
+    { id:3, titulo:'Culto Domingo Noite', data:'2026-05-25', hora:'19:00', status:'planejada', obs:'Culto evangelístico', playlist:'',
+      membros:[ {id:1,confirm:'pendente'},{id:2,confirm:'pendente'},{id:4,confirm:'pendente'},{id:5,confirm:'pendente'},{id:7,confirm:'pendente'} ],
+      oferta:{ nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', escolhidoPor:null },
+      slots:[
+        { pos:1, nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:null },
+      ],
+      sugestoes:[]
+    },
+  ]);
+
+  DB.set('avisos', [
+    { id:1, titulo:'⚠️ Ensaio confirmado para sexta!', msg:'Pessoal, ensaio de sexta às 19h confirmado. Chegarem 15 min antes para afinação. Levar instrumentos.', tipo:'urgente', por:'Pastor João', quando:'05/05/2026 10:23' },
+    { id:2, titulo:'ℹ️ Novos tons das músicas', msg:'Atualizamos os tons de Oceans (Dm→Am) e Reckless Love (G→A). Atualizem suas cifragens.', tipo:'info', por:'Ricardo Barbosa', quando:'04/05/2026 14:30' },
+    { id:3, titulo:'📋 Escala publicada — 18 de Maio', msg:'A escala do Culto Domingo Manhã foi publicada. Confirme presença até quinta.', tipo:'geral', por:'Sistema', quando:'03/05/2026 09:00' },
+  ]);
+
+  DB.set('chat', [
+    { id:1, de:'RB', av:'av1', msg:'Galera, alguém pode colocar o arranjo de Oceans no Drive?', hora:'14:12', mine:false },
+    { id:2, de:'CM', av:'av2', msg:'Posso sim! Coloco hoje à noite 🎶', hora:'14:15', mine:false },
+    { id:3, de:'EU', av:'av3', msg:'Confirmo presença no ensaio de sexta 👍', hora:'14:20', mine:true },
+    { id:4, de:'TS', av:'av3', msg:'Eu confirmo também! Vai ser ótimo 🥁', hora:'14:22', mine:false },
+  ]);
+
+  DB.set('seeded2', true);
+}
+
+/* ================================================================
+   STATE
+================================================================ */
+let currentEscalaId = null;
+let editingSlotPos   = null;
+let editingMembroId  = null;
+let calYear = 2026, calMonth = 4;
+
+const ME = { id:1, nome:'Ricardo Barbosa', iniciais:'RB', av:'av1' };
+
+/* ================================================================
+   NAVIGATION
+================================================================ */
+const NAV_CFG = {
+  dashboard:      { title:'Início',       action:'+ Nova Escala',   modal:'modal-escala' },
+  escalas:        { title:'Escalas',      action:'+ Nova Escala',   modal:'modal-escala' },
+  'escala-detail':{ title:'Detalhe',      action:null },
+  membros:        { title:'Membros',      action:'+ Novo Membro',   modal:'modal-membro' },
+  'membro-detail':{ title:'Membro',       action:null },
+  musicas:        { title:'Repertório',   action:'+ Adicionar Música', modal:'modal-musica' },
+  avisos:         { title:'Avisos',       action:'+ Novo Aviso',    modal:'modal-aviso' },
+  chat:           { title:'Chat',         action:null },
+  agenda:         { title:'Agenda',       action:null },
+  relatorios:     { title:'Relatórios',   action:null },
+  ministerio:     { title:'Ministério',   action:null },
+};
+
+function navigate(page, extra) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  const vEl = document.getElementById('view-'+page);
+  if (vEl) vEl.classList.add('active');
+
+  const navEl = document.querySelector(`[data-nav="${page}"]`);
+  if (navEl) navEl.classList.add('active');
+
+  const cfg = NAV_CFG[page] || { title: page };
+  document.getElementById('page-title').textContent = cfg.title;
+
+  const actBtn = document.getElementById('main-action');
+  if (cfg.action) { actBtn.style.display=''; actBtn.textContent = cfg.action; }
+  else actBtn.style.display='none';
+
+  closeSidebar();
+
+  // Render views
+  if (page === 'dashboard')      renderDashboard();
+  if (page === 'escalas')        renderEscalas();
+  if (page === 'escala-detail')  renderEscalaDetail(extra);
+  if (page === 'membros')        renderMembros();
+  if (page === 'membro-detail')  renderMembroDetail(extra);
+  if (page === 'musicas')        renderMusicas();
+  if (page === 'avisos')         renderAvisos();
+  if (page === 'chat')           renderChat();
+  if (page === 'agenda')         renderCalendar();
+  if (page === 'ministerio')     renderMinisterio();
+}
+
+function handleMainAction() {
+  const pg = Object.keys(NAV_CFG).find(k => NAV_CFG[k].title === document.getElementById('page-title').textContent);
+  if (!pg || !NAV_CFG[pg].modal) return;
+  if (NAV_CFG[pg].modal === 'modal-membro') { openNovoMembro(); return; }
+  openModal(NAV_CFG[pg].modal);
+}
+
+/* ================================================================
+   SIDEBAR
+================================================================ */
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay-bg').classList.toggle('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay-bg').classList.remove('open');
+}
+
+/* ================================================================
+   MODAL
+================================================================ */
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.querySelectorAll('.modal-overlay').forEach(m =>
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); })
+);
+
+/* ================================================================
+   TABS
+================================================================ */
+function switchTab(btn, tabId) {
+  const parent = btn.closest('.card-body') || btn.closest('.modal-body');
+  parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['tab-slots','tab-sugestoes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (id === tabId) ? '' : 'none';
+  });
+}
+
+/* ================================================================
+   RENDER: DASHBOARD
+================================================================ */
+function renderDashboard() {
+  const escalas = DB.get('escalas',[]);
+  const membros = DB.get('membros',[]);
+  const avisos  = DB.get('avisos',[]);
+
+  // Próximas escalas
+  const dashEsc = document.getElementById('dash-escalas');
+  dashEsc.innerHTML = escalas.slice(0,3).map(e => `
+    <div onclick="openEscala(${e.id})" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" class="esc-row-hover">
+      ${escalaDateBadge(e.data,'small')}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.titulo}</div>
+        <div style="font-size:11px;color:var(--muted);">${e.membros.length} membros</div>
+      </div>
+      ${statusTag(e.status)}
+    </div>
+  `).join('') || '<div class="empty-state"><div class="ei">📋</div><p>Nenhuma escala</p></div>';
+
+  // Confirmações
+  const esc1 = escalas[0];
+  const dashConf = document.getElementById('dash-confirms');
+  if (esc1) {
+    dashConf.innerHTML = esc1.membros.slice(0,5).map(me => {
+      const m = membros.find(x=>x.id===me.id);
+      if (!m) return '';
+      return `<div class="member-row">
+        <div class="avatar ${m.av}">${m.iniciais}</div>
+        <div class="m-info"><div class="name">${m.nome}</div><div class="role">${memberFuncoes(m).join(', ')}</div></div>
+        ${confirmPill(me.confirm)}
+      </div>`;
+    }).join('');
+  }
+
+  // Avisos
+  document.getElementById('dash-avisos').innerHTML = avisos.slice(0,2).map(a => `
+    <div class="aviso-card ${a.tipo==='urgente'?'urg':a.tipo==='info'?'info':''}">
+      <h4>${a.titulo}</h4><p>${a.msg}</p>
+      <div class="av-meta">Por ${a.por} • ${a.quando}</div>
+    </div>
+  `).join('');
+}
+
+/* ================================================================
+   RENDER: ESCALAS
+================================================================ */
+function renderEscalas(filter='todas') {
+  const escalas = DB.get('escalas',[]);
+  const list = document.getElementById('escalas-list');
+  const hoje = new Date().toISOString().split('T')[0];
+
+  let filtered = escalas;
+  if (filter==='publicada') filtered = escalas.filter(e=>e.status==='publicada');
+  else if (filter==='rascunho') filtered = escalas.filter(e=>e.status==='rascunho');
+  else if (filter==='passadas') filtered = escalas.filter(e=>e.data < hoje);
+  else filtered = escalas; // todas
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state"><div class="ei">📋</div><h3>Nenhuma escala</h3><p>Crie sua primeira escala</p></div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(e => {
+    const d = new Date(e.data+'T00:00:00');
+    const day = String(d.getDate()).padStart(2,'0');
+    const mon = d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','').toUpperCase();
+    const conf = e.membros.filter(m=>m.confirm==='confirmado').length;
+    return `<div class="escala-card" onclick="openEscala(${e.id})">
+      <div class="escala-date"><div class="eday">${day}</div><div class="emon">${mon}</div></div>
+      <div class="escala-info">
+        <h4>${e.titulo}</h4>
+        <p>${weekDay(e.data)} • ${e.hora} • ${e.membros.length} membros • ${e.slots.length} músicas</p>
+      </div>
+      <div class="escala-tags">
+        ${statusTag(e.status)}
+        ${conf>0?`<span class="tag tag-green">✓ ${conf}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterEsc(btn, f) {
+  document.querySelectorAll('.filt').forEach(b=>b.classList.remove('active-filt'));
+  btn.classList.add('active-filt');
+  renderEscalas(f);
+}
+
+function openEscala(id) {
+  currentEscalaId = id;
+  navigate('escala-detail', id);
+}
+
+/* ================================================================
+   RENDER: ESCALA DETAIL
+================================================================ */
+function renderEscalaDetail(id) {
+  id = id || currentEscalaId;
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===id);
+  if (!e) return;
+  currentEscalaId = id;
+
+  document.getElementById('esc-detail-name').textContent = e.titulo;
+  document.getElementById('esc-detail-data').textContent = formatDate(e.data);
+  document.getElementById('esc-detail-hora').textContent = e.hora;
+  document.getElementById('esc-detail-info').innerHTML = `${formatDate(e.data)} • ${e.hora}`;
+  document.getElementById('esc-detail-status').innerHTML = statusTag(e.status);
+
+  // Membros
+  const membros = DB.get('membros',[]);
+  document.getElementById('esc-membros').innerHTML = e.membros.map(me => {
+    const m = membros.find(x=>x.id===me.id);
+    if (!m) return '';
+    const funcoes = memberFuncoes(m);
+    return `<div class="member-row">
+      <div class="avatar ${m.av}">${m.iniciais}</div>
+      <div class="m-info">
+        <div class="name">${m.nome}</div>
+        <div class="role" style="display:flex;flex-wrap:wrap;gap:3px;">${funcoes.map(f=>`<span style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:4px;">${f}</span>`).join('')}</div>
+      </div>
+      <select onchange="changeConfirm(${id},${m.id},this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:3px 6px;font-size:11px;cursor:pointer;">
+        <option value="pendente" ${me.confirm==='pendente'?'selected':''}>⏳ Pendente</option>
+        <option value="confirmado" ${me.confirm==='confirmado'?'selected':''}>✓ Confirmado</option>
+        <option value="recusado" ${me.confirm==='recusado'?'selected':''}>✗ Recusou</option>
+      </select>
+      <div class="icon-btn" onclick="removeMemberFromEscala(${id},${m.id})" title="Remover">✕</div>
+    </div>`;
+  }).join('') || '<div class="empty-state" style="padding:20px;"><p>Nenhum membro adicionado</p></div>';
+
+  // Confirm summary
+  const conf = e.membros.filter(m=>m.confirm==='confirmado').length;
+  const pend = e.membros.filter(m=>m.confirm==='pendente').length;
+  const rec  = e.membros.filter(m=>m.confirm==='recusado').length;
+  document.getElementById('esc-confirm-summary').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+      <div style="background:rgba(52,211,153,0.08);border-radius:10px;padding:12px;">
+        <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--green);">${conf}</div>
+        <div style="font-size:11px;color:var(--muted);">Confirmados</div>
+      </div>
+      <div style="background:rgba(240,192,64,0.08);border-radius:10px;padding:12px;">
+        <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--gold);">${pend}</div>
+        <div style="font-size:11px;color:var(--muted);">Pendentes</div>
+      </div>
+      <div style="background:rgba(248,113,113,0.08);border-radius:10px;padding:12px;">
+        <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--red);">${rec}</div>
+        <div style="font-size:11px;color:var(--muted);">Recusaram</div>
+      </div>
+    </div>`;
+
+  // Slots count
+  const mainSlots = (e.slots||[]).filter(s=>s.tipo!=='ofertorio'&&s.tipo!=='santa-ceia');
+  document.getElementById('esc-slots-count').textContent = `${mainSlots.filter(s=>s.nome).length}/${mainSlots.length} músicas`;
+
+  renderSlots();
+  renderSugestoes();
+
+  // Add membro modal list
+  const avail = membros.filter(m => !e.membros.find(em=>em.id===m.id));
+  document.getElementById('modal-add-membro-escala-list').innerHTML = avail.length
+    ? avail.map(m => {
+        const funcoes = memberFuncoes(m);
+        const indisp = isIndisponivel(m, e.data);
+        return `<div class="member-row" style="cursor:pointer;${indisp?'opacity:0.5;':''}" onclick="${indisp?'':` addMembroEscala(${m.id})`}">
+          <div class="avatar ${m.av}">${m.iniciais}</div>
+          <div class="m-info">
+            <div class="name">${m.nome}</div>
+            <div class="role" style="display:flex;flex-wrap:wrap;gap:3px;">${funcoes.map(f=>`<span style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:4px;">${f}</span>`).join('')}</div>
+          </div>
+          ${indisp?'<span class="tag tag-red">🚫 Indisp.</span>':'<button class="btn btn-ghost btn-xs">+ Adicionar</button>'}
+        </div>`;
+      }).join('')
+    : '<div class="empty-state"><p>Todos os membros já estão na escala</p></div>';
+}
+
+/* ================================================================
+   SLOTS (Repertório da Escala)
+================================================================ */
+function isFirstSunday(dateStr) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.getDay() === 0 && d.getDate() <= 7;
+}
+
+function slotMusicHtml(s, editKey) {
+  const membros = DB.get('membros',[]);
+  const escolhedor = s.escolhidoPor ? membros.find(m=>m.id===s.escolhidoPor) : null;
+  return `<div class="slot-body">
+    ${s.nome
+      ? `<div class="slot-music">
+          <div>
+            <div class="slot-music-name">${s.nome}</div>
+            <div class="slot-music-artist">${s.artista||''} ${s.bpm?`• ${s.bpm} BPM`:''}</div>
+          </div>
+          ${s.tom?`<div class="tone-badge">${s.tom}</div>`:''}
+        </div>
+        ${escolhedor?`<div style="font-size:11px;color:var(--muted);margin-top:4px;">escolhida por ${escolhedor.nome.split(' ')[0]}</div>`:''}
+        <div class="slot-links">
+          ${s.spotify?`<a class="link-chip lc-spotify" href="${s.spotify}" target="_blank">🎧 Spotify</a>`:''}
+          ${s.youtube?`<a class="link-chip lc-youtube" href="${s.youtube}" target="_blank">▶️ YouTube</a>`:''}
+          ${s.cifra?`<a class="link-chip lc-cifra" href="${s.cifra}" target="_blank">🎸 Cifra</a>`:''}
+        </div>`
+      : `<div class="slot-empty"><span>— vazio —</span><button class="btn btn-ghost btn-xs" onclick="openEditSlot('${editKey}')">+ Escolher música</button></div>`
+    }
+  </div>`;
+}
+
+function renderSlots() {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  if (!e) return;
+
+  const slots = (e.slots||[]).filter(s=>s.tipo!=='ofertorio'&&s.tipo!=='santa-ceia');
+  const oferta = e.oferta || { nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', escolhidoPor:null };
+  const santaCeia = isFirstSunday(e.data);
+
+  // Playlist link
+  const playlistHtml = e.playlist
+    ? `<div style="margin-bottom:12px;padding:10px 14px;background:rgba(30,215,96,0.07);border:1px solid rgba(30,215,96,0.2);border-radius:var(--r-sm);display:flex;align-items:center;gap:10px;">
+        <span style="font-size:13px;font-weight:600;">🎧 Playlist do dia:</span>
+        <a href="${e.playlist}" target="_blank" class="link-chip lc-spotify" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Abrir playlist</a>
+        <button class="btn btn-ghost btn-xs" onclick="editPlaylist()">✏️</button>
+      </div>`
+    : `<button class="btn btn-ghost btn-sm" style="margin-bottom:12px;" onclick="editPlaylist()">🎧 + Adicionar playlist do dia</button>`;
+
+  // Repertório principal
+  const slotsHtml = slots.map(s => `
+    <div class="slot-wrap" id="slot-${s.pos}">
+      <div class="slot-header">
+        <div class="slot-num">${s.pos}</div>
+        <div class="slot-title">Posição ${s.pos}</div>
+        <button class="btn btn-ghost btn-xs" onclick="openEditSlot(${s.pos})">✏️ Editar</button>
+      </div>
+      ${slotMusicHtml(s, s.pos)}
+    </div>`).join('');
+
+  // Oferta
+  const ofertaHtml = `
+    <div class="slot-wrap" style="border-color:rgba(240,192,64,0.3);background:rgba(240,192,64,0.04);">
+      <div class="slot-header">
+        <div class="slot-num slot-special">💰</div>
+        <div class="slot-title">Oferta</div>
+        <button class="btn btn-ghost btn-xs" onclick="openEditSlot('oferta')">✏️ Editar</button>
+      </div>
+      ${slotMusicHtml(oferta, 'oferta')}
+    </div>`;
+
+  // Santa Ceia (só no primeiro domingo)
+  const santaCeiaHtml = santaCeia ? `
+    <div class="slot-wrap" style="border-color:rgba(201,167,106,0.3);background:rgba(124,92,252,0.04);">
+      <div class="slot-header">
+        <div class="slot-num slot-special">✝️</div>
+        <div class="slot-title">Santa Ceia</div>
+        <button class="btn btn-ghost btn-xs" onclick="openEditSlot('santa-ceia')">✏️ Editar</button>
+      </div>
+      ${slotMusicHtml(e.santaCeia||{nome:'',artista:'',tom:'',bpm:'',spotify:'',youtube:'',cifra:''}, 'santa-ceia')}
+    </div>` : '';
+
+  document.getElementById('slots-list').innerHTML = `
+    ${playlistHtml}
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:8px 0 6px;">🎵 Repertório Principal</div>
+    ${slotsHtml}
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 6px;">Seções Especiais</div>
+    ${ofertaHtml}
+    ${santaCeiaHtml}
+    ${santaCeia?'':'<div style="font-size:11px;color:var(--muted);padding:4px 0;">✝️ Santa Ceia aparece automaticamente no 1º domingo de cada mês.</div>'}
+  `;
+}
+
+function openEditSlot(pos) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  editingSlotPos = pos;
+  let s, titulo;
+  if (pos === 'oferta') {
+    s = e.oferta || {}; titulo = '💰 Oferta';
+  } else if (pos === 'santa-ceia') {
+    s = e.santaCeia || {}; titulo = '✝️ Santa Ceia';
+  } else {
+    const posNum = Number(pos);
+    editingSlotPos = posNum;
+    s = e.slots.find(x=>x.pos===posNum) || {}; titulo = `🎵 Posição ${posNum}`;
+  }
+  document.getElementById('modal-slot-title').textContent = titulo;
+  document.getElementById('slot-name').value    = s.nome||'';
+  document.getElementById('slot-artist').value  = s.artista||'';
+  document.getElementById('slot-tom').value     = s.tom||'';
+  document.getElementById('slot-bpm').value     = s.bpm||'';
+  document.getElementById('slot-tipo').value    = s.tipo||'';
+  document.getElementById('slot-spotify').value = s.spotify||'';
+  document.getElementById('slot-youtube').value = s.youtube||'';
+  document.getElementById('slot-cifra').value   = s.cifra||'';
+  openModal('modal-slot');
+}
+
+function saveSlot() {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const data = {
+    nome:    document.getElementById('slot-name').value.trim(),
+    artista: document.getElementById('slot-artist').value.trim(),
+    tom:     document.getElementById('slot-tom').value,
+    bpm:     document.getElementById('slot-bpm').value,
+    tipo:    document.getElementById('slot-tipo').value,
+    spotify: document.getElementById('slot-spotify').value.trim(),
+    youtube: document.getElementById('slot-youtube').value.trim(),
+    cifra:   document.getElementById('slot-cifra').value.trim(),
+    escolhidoPor: ME.id,
+  };
+  if (editingSlotPos === 'oferta') {
+    e.oferta = Object.assign(e.oferta||{}, data);
+  } else if (editingSlotPos === 'santa-ceia') {
+    e.santaCeia = Object.assign(e.santaCeia||{}, data);
+  } else {
+    const s = e.slots.find(x=>x.pos===editingSlotPos);
+    Object.assign(s, data);
+    if (!s.escolhidoPor) s.escolhidoPor = ME.id;
+  }
+  DB.set('escalas', escalas);
+  closeModal('modal-slot');
+  renderSlots();
+  const label = editingSlotPos==='oferta'?'Oferta':editingSlotPos==='santa-ceia'?'Santa Ceia':`posição ${editingSlotPos}`;
+  toast(`✅ Música salva — ${label}`);
+}
+
+function editPlaylist() {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const url = prompt('Cole o link da playlist (Spotify, YouTube, etc.):', e.playlist||'');
+  if (url === null) return;
+  e.playlist = url.trim();
+  DB.set('escalas', escalas);
+  renderSlots();
+  toast('✅ Playlist salva!');
+}
+
+function addSlot() {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const maxPos = Math.max(...e.slots.map(s=>s.pos), 0);
+  e.slots.push({ pos:maxPos+1, nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:null });
+  DB.set('escalas', escalas);
+  renderSlots();
+  const mainSlots = (e.slots||[]).filter(s=>s.tipo!=='ofertorio'&&s.tipo!=='santa-ceia');
+  document.getElementById('esc-slots-count').textContent = `${mainSlots.filter(s=>s.nome).length}/${mainSlots.length} músicas`;
+}
+
+/* ================================================================
+   SUGESTÕES
+================================================================ */
+function renderSugestoes() {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const membros = DB.get('membros',[]);
+  const list = document.getElementById('sugestoes-list');
+
+  if (!e.sugestoes.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:20px;"><p>Nenhuma sugestão ainda</p></div>';
+    return;
+  }
+
+  list.innerHTML = e.sugestoes.map(s => {
+    const por = membros.find(m=>m.id===s.por);
+    const aprov = s.aprovadoPor ? membros.find(m=>m.id===s.aprovadoPor) : null;
+    const statusLabel = {pending:'⏳ Pendente', approved:'✅ Aceita', rejected:'✗ Recusada'}[s.status];
+    return `<div class="sug-card ${s.status}">
+      <div class="sug-info">
+        <div class="sug-title">${s.nome} ${s.artista?`<span style="color:var(--muted);font-weight:400;font-size:12px;">— ${s.artista}</span>`:''}
+        </div>
+        <div class="sug-meta">
+          Sugerida por <strong>${por?.nome||'Membro'}</strong>
+          ${aprov?` • Aceita por <strong>${aprov.nome}</strong>`:''}
+          • <span style="color:${s.status==='pending'?'var(--gold)':s.status==='approved'?'var(--green)':'var(--red)'}">${statusLabel}</span>
+        </div>
+      </div>
+      ${s.status==='pending' ? `<div class="sug-actions">
+        <button class="btn btn-success btn-xs" onclick="decideSugestao(${s.id},'approved')">✓</button>
+        <button class="btn btn-danger btn-xs" onclick="decideSugestao(${s.id},'rejected')">✕</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function addSugestao() {
+  const nome = document.getElementById('sug-name').value.trim();
+  if (!nome) { toast('⚠️ Digite o nome da música'); return; }
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  // Verificar se já sugeriu
+  if (e.sugestoes.find(s=>s.por===ME.id && s.status==='pending')) {
+    toast('⚠️ Você já tem uma sugestão pendente'); return;
+  }
+  const newId = Math.max(0,...e.sugestoes.map(s=>s.id))+1;
+  e.sugestoes.push({
+    id: newId,
+    nome,
+    artista: document.getElementById('sug-artist').value.trim(),
+    por: ME.id,
+    status:'pending'
+  });
+  DB.set('escalas', escalas);
+  document.getElementById('sug-name').value='';
+  document.getElementById('sug-artist').value='';
+  renderSugestoes();
+  toast('💡 Sugestão enviada!');
+}
+
+function decideSugestao(sugId, status) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const s = e.sugestoes.find(x=>x.id===sugId);
+  s.status = status;
+  if (status==='approved') s.aprovadoPor = ME.id;
+  DB.set('escalas', escalas);
+  renderSugestoes();
+  toast(status==='approved'?'✅ Sugestão aceita!':'Sugestão recusada');
+}
+
+/* ================================================================
+   RENDER: MEMBROS
+================================================================ */
+function renderMembros() {
+  const membros = DB.get('membros',[]);
+  const busca = (document.getElementById('busca-membro')?.value||'').toLowerCase();
+  const filtrado = membros.filter(m => m.nome.toLowerCase().includes(busca));
+
+  document.getElementById('membros-count').textContent = `Membros (${filtrado.length})`;
+
+  document.getElementById('membros-list').innerHTML = filtrado.map(m => {
+    const funcoes = memberFuncoes(m);
+    const isVocal = funcoes.some(f=>f.includes('Vocal'));
+    const alert = isVocal ? memberFreqAlert(m.id) : '';
+    return `<div class="member-row" style="cursor:pointer;" onclick="navigate('membro-detail',${m.id})">
+      <div class="avatar ${m.av}">${m.iniciais}</div>
+      <div class="m-info">
+        <div class="name">${m.nome}</div>
+        <div class="role" style="display:flex;flex-wrap:wrap;gap:3px;">${funcoes.map(f=>`<span style="font-size:10.5px;background:var(--surface2);padding:1px 6px;border-radius:5px;">${f}</span>`).join('')}</div>
+      </div>
+      ${alert}
+      ${m.status==='indisponivel'?'<span class="tag tag-red">🚫 Indisp.</span>':'<span class="tag tag-green">Ativo</span>'}
+      ${m.perm==='admin'?'<span class="tag tag-gold" style="font-size:10px;">Admin</span>':''}
+    </div>`;
+  }).join('');
+}
+
+function memberFuncoes(m) {
+  return (m.funcoes && m.funcoes.length) ? m.funcoes : (m.funcao ? [m.funcao] : ['—']);
+}
+
+function memberFreqAlert(membroId) {
+  const escalas = DB.get('escalas',[]).filter(e=>e.status==='publicada');
+  if (escalas.length < 3) return '';
+  const count = escalas.filter(e=>e.membros.find(em=>em.id===membroId)).length;
+  const pct = count / escalas.length;
+  if (pct >= 0.85) return '<span class="tag tag-gold" title="Escalado em quase todos os cultos">🔥 Sempre</span>';
+  if (pct <= 0.15) return '<span class="tag tag-muted" title="Raramente escalado">💤 Raro</span>';
+  return '';
+}
+
+function renderMembroDetail(id) {
+  const membros = DB.get('membros',[]);
+  const m = membros.find(x=>x.id===id);
+  if (!m) return;
+  editingMembroId = id;
+
+  document.getElementById('md-name').textContent = m.nome;
+  const funcoes = memberFuncoes(m);
+  document.getElementById('md-info').innerHTML = `
+    <div class="member-row">
+      <div class="avatar ${m.av}" style="width:56px;height:56px;font-size:20px;">${m.iniciais}</div>
+      <div class="m-info">
+        <div class="name" style="font-size:16px;">${m.nome}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;">${funcoes.map(f=>`<span class="tag tag-purple" style="font-size:11px;">${f}</span>`).join('')}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">${m.email||''}</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><div class="form-label">Telefone</div><div style="font-size:13px;">${m.tel||'—'}</div></div>
+      <div><div class="form-label">Permissão</div><div style="font-size:13px;">${m.perm}</div></div>
+    </div>`;
+
+  renderIndisps(m);
+}
+
+function renderIndisps(m) {
+  const el = document.getElementById('md-indisps');
+  if (!m.indisps || !m.indisps.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:20px;"><p>Nenhuma indisponibilidade declarada</p></div>';
+    return;
+  }
+  const icons = {viagem:'✈️',saude:'🏥',trabalho:'💼',ferias:'🏖️',outro:'📋'};
+  el.innerHTML = m.indisps.map(i => `
+    <div class="indisp-card">
+      <div style="font-size:22px;">${icons[i.tipo]||'📋'}</div>
+      <div style="flex:1;">
+        <div class="ind-period">${formatDate(i.inicio)} → ${formatDate(i.fim)}</div>
+        <div class="ind-reason">${i.motivo||i.tipo}</div>
+      </div>
+      <button class="btn btn-danger btn-xs" onclick="removeIndisp(${m.id},${i.id})">✕</button>
+    </div>
+  `).join('');
+}
+
+function saveIndisp() {
+  const inicio = document.getElementById('ind-inicio').value;
+  const fim    = document.getElementById('ind-fim').value;
+  if (!inicio || !fim) { toast('⚠️ Preencha as datas'); return; }
+  if (inicio > fim) { toast('⚠️ Data inicial deve ser antes da final'); return; }
+
+  const membros = DB.get('membros',[]);
+  const m = membros.find(x=>x.id===editingMembroId);
+  const newId = Math.max(0,...(m.indisps||[]).map(i=>i.id))+1;
+  if (!m.indisps) m.indisps = [];
+  m.indisps.push({
+    id: newId,
+    inicio,
+    fim,
+    tipo: document.getElementById('ind-tipo').value,
+    motivo: document.getElementById('ind-motivo').value.trim()
+  });
+  m.status = 'indisponivel';
+  DB.set('membros', membros);
+  closeModal('modal-indisp');
+  renderMembroDetail(editingMembroId);
+  toast('🚫 Indisponibilidade declarada');
+}
+
+function removeIndisp(mId, iId) {
+  const membros = DB.get('membros',[]);
+  const m = membros.find(x=>x.id===mId);
+  m.indisps = m.indisps.filter(i=>i.id!==iId);
+  if (!m.indisps.length) m.status = 'ativo';
+  DB.set('membros', membros);
+  renderMembroDetail(mId);
+  toast('✅ Indisponibilidade removida');
+}
+
+function isIndisponivel(m, data) {
+  return (m.indisps||[]).some(i => data >= i.inicio && data <= i.fim);
+}
+
+/* ================================================================
+   RENDER: MÚSICAS
+================================================================ */
+function renderMusicas() {
+  const musicas = DB.get('musicas',[]);
+  const busca = (document.getElementById('busca-musica')?.value||'').toLowerCase();
+  const filtrado = musicas.filter(m =>
+    m.titulo.toLowerCase().includes(busca) || (m.artista||'').toLowerCase().includes(busca)
+  );
+
+  document.getElementById('musicas-count').textContent = `Repertório (${filtrado.length} músicas)`;
+
+  document.getElementById('musicas-list').innerHTML = filtrado.map((m, i) => `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="width:30px;height:30px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);flex-shrink:0;">${i+1}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.titulo}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:1px;">${m.artista||''}${m.tom?` • ${m.tom}`:''}${m.bpm?` • ${m.bpm} BPM`:''}</div>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${m.spotify?`<a class="link-chip lc-spotify" href="${m.spotify}" target="_blank">🎧</a>`:''}
+        ${m.youtube?`<a class="link-chip lc-youtube" href="${m.youtube}" target="_blank">▶️</a>`:''}
+        ${m.cifra  ?`<a class="link-chip lc-cifra"   href="${m.cifra}"   target="_blank">🎸</a>`:''}
+      </div>
+    </div>
+  `).join('') || '<div class="empty-state"><div class="ei">🎵</div><h3>Nenhuma música</h3></div>';
+}
+
+function saveMusica() {
+  const titulo = document.getElementById('nm-titulo').value.trim();
+  if (!titulo) { toast('⚠️ Digite o nome da música'); return; }
+  const musicas = DB.get('musicas',[]);
+  const newId = Math.max(0,...musicas.map(m=>m.id))+1;
+  musicas.push({
+    id: newId,
+    titulo,
+    artista: document.getElementById('nm-artista').value.trim(),
+    tom:     document.getElementById('nm-tom').value,
+    bpm:     document.getElementById('nm-bpm').value,
+    spotify: document.getElementById('nm-spotify').value.trim(),
+    youtube: document.getElementById('nm-youtube').value.trim(),
+    cifra:   document.getElementById('nm-cifra').value.trim(),
+    pasta:   document.getElementById('nm-pasta').value,
+  });
+  DB.set('musicas', musicas);
+  closeModal('modal-musica');
+  renderMusicas();
+  toast('✅ Música adicionada ao repertório!');
+}
+
+/* ================================================================
+   RENDER: AVISOS
+================================================================ */
+function renderAvisos() {
+  const avisos = DB.get('avisos',[]);
+  document.getElementById('avisos-list').innerHTML = avisos.map(a => `
+    <div class="aviso-card ${a.tipo==='urgente'?'urg':a.tipo==='info'?'info':''}">
+      <h4>${a.titulo}</h4><p>${a.msg}</p>
+      <div class="av-meta">Por ${a.por} • ${a.quando}</div>
+    </div>
+  `).join('') || '<div class="empty-state"><div class="ei">🔔</div><h3>Nenhum aviso</h3></div>';
+}
+
+function saveAviso() {
+  const titulo = document.getElementById('nav-titulo').value.trim();
+  const msg    = document.getElementById('nav-msg').value.trim();
+  if (!titulo || !msg) { toast('⚠️ Preencha título e mensagem'); return; }
+  const avisos = DB.get('avisos',[]);
+  const newId = Math.max(0,...avisos.map(a=>a.id))+1;
+  const now = new Date();
+  avisos.unshift({
+    id: newId, titulo, msg,
+    tipo: document.getElementById('nav-tipo').value,
+    por: ME.nome,
+    quando: now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
+  });
+  DB.set('avisos', avisos);
+  closeModal('modal-aviso');
+  renderAvisos();
+  toast('🔔 Aviso enviado!');
+}
+
+/* ================================================================
+   RENDER: CHAT
+================================================================ */
+function renderChat() {
+  const msgs = DB.get('chat',[]);
+  document.getElementById('chat-msgs').innerHTML = msgs.map(m => `
+    <div class="chat-msg ${m.mine?'mine':'other'}">
+      <div class="chat-av ${m.av}">${m.de}</div>
+      <div>
+        ${!m.mine?`<div style="font-size:10.5px;color:var(--muted);margin-bottom:3px;">${m.de}</div>`:''}
+        <div class="chat-bubble">${m.msg}</div>
+        <div class="chat-time">${m.hora}</div>
+      </div>
+    </div>
+  `).join('');
+  const el = document.getElementById('chat-msgs');
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendMsg() {
+  const inp = document.getElementById('chat-input');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  const msgs = DB.get('chat',[]);
+  const now = new Date();
+  const hora = now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
+  msgs.push({ id: Date.now(), de: ME.iniciais, av: ME.av, msg, hora, mine: true });
+  DB.set('chat', msgs);
+  inp.value = '';
+  renderChat();
+}
+
+/* ================================================================
+   CALENDÁRIO
+================================================================ */
+const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DAY_NAMES   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+function renderCalendar() {
+  document.getElementById('cal-title').textContent = MONTH_NAMES[calMonth]+' '+calYear;
+
+  // Headers
+  document.getElementById('cal-headers').innerHTML = DAY_NAMES.map(d=>
+    `<div class="cal-dh">${d}</div>`
+  ).join('');
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const today = new Date();
+  const escalas = DB.get('escalas',[]);
+
+  // Dias com evento
+  const eventDays = new Set(
+    escalas.filter(e => {
+      const d = new Date(e.data+'T00:00:00');
+      return d.getFullYear()===calYear && d.getMonth()===calMonth;
+    }).map(e => new Date(e.data+'T00:00:00').getDate())
+  );
+
+  // Dias indisponíveis do usuário atual
+  const meData = DB.get('membros',[]).find(m=>m.id===ME.id);
+  const indispDays = new Set();
+  if (meData?.indisps) {
+    for (let d=1; d<=daysInMonth; d++) {
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if (isIndisponivel(meData, dateStr)) indispDays.add(d);
+    }
+  }
+
+  let html = Array(firstDay).fill('<div class="cal-day empty"></div>').join('');
+  for (let d=1; d<=daysInMonth; d++) {
+    const isToday = calYear===today.getFullYear() && calMonth===today.getMonth() && d===today.getDate();
+    const hasEvent = eventDays.has(d);
+    const indisp   = indispDays.has(d);
+    let cls = 'cal-day';
+    if (isToday) cls += ' today';
+    if (hasEvent) cls += ' has-event';
+    if (indisp)   cls += ' unavailable';
+    html += `<div class="${cls}" onclick="calDayClick(${d})">${d}</div>`;
+  }
+
+  document.getElementById('cal-days').innerHTML = html;
+
+  // Events list
+  const monthEscalas = escalas.filter(e => {
+    const d = new Date(e.data+'T00:00:00');
+    return d.getFullYear()===calYear && d.getMonth()===calMonth;
+  });
+
+  document.getElementById('cal-events').innerHTML = monthEscalas.length
+    ? monthEscalas.map(e => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:10px;margin-bottom:7px;cursor:pointer;border:1px solid var(--border);" onclick="openEscala(${e.id})">
+          ${escalaDateBadge(e.data,'small')}
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:13px;">${e.titulo}</div>
+            <div style="font-size:11px;color:var(--muted);">${weekDay(e.data)} • ${e.hora}</div>
+          </div>
+          ${statusTag(e.status)}
+        </div>`).join('')
+    : '<div class="empty-state" style="padding:30px;"><p>Nenhum evento neste mês</p></div>';
+}
+
+function changeMonth(d) {
+  calMonth += d;
+  if (calMonth > 11) { calMonth=0; calYear++; }
+  if (calMonth < 0)  { calMonth=11; calYear--; }
+  renderCalendar();
+}
+
+function calDayClick(d) {
+  const escalas = DB.get('escalas',[]);
+  const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const esc = escalas.find(e=>e.data===dateStr);
+  if (esc) openEscala(esc.id);
+}
+
+/* ================================================================
+   MINISTÉRIO
+================================================================ */
+function renderMinisterio() {
+  document.getElementById('funcoes-list').innerHTML = FUNCOES_LISTA.map(f =>
+    `<span class="tag tag-purple" style="padding:5px 12px;font-size:12px;">${f}</span>`
+  ).join('');
+}
+
+function openNovoMembro() {
+  document.getElementById('nm2-funcoes').innerHTML = FUNCOES_LISTA.map(f =>
+    `<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 8px;background:var(--surface2);border-radius:7px;cursor:pointer;">
+      <input type="checkbox" value="${f}" style="accent-color:var(--accent);width:14px;height:14px;">
+      ${f}
+    </label>`
+  ).join('');
+  openModal('modal-membro');
+}
+
+/* ================================================================
+   HELPERS
+================================================================ */
+function createEscala() {
+  const titulo = document.getElementById('ne-titulo').value.trim();
+  const data   = document.getElementById('ne-data').value;
+  const hora   = document.getElementById('ne-hora').value;
+  if (!titulo || !data) { toast('⚠️ Preencha título e data'); return; }
+
+  const escalas = DB.get('escalas',[]);
+  const newId = Math.max(0,...escalas.map(e=>e.id))+1;
+  const emptySlot = pos => ({ pos, nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:null });
+  escalas.push({
+    id: newId, titulo, data, hora,
+    status: document.getElementById('ne-status').value,
+    obs: document.getElementById('ne-obs').value.trim(),
+    playlist: document.getElementById('ne-playlist').value.trim(),
+    membros: [],
+    oferta: { nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', escolhidoPor:null },
+    slots: [emptySlot(1), emptySlot(2), emptySlot(3), emptySlot(4), emptySlot(5)],
+    sugestoes: []
+  });
+  DB.set('escalas', escalas);
+  closeModal('modal-escala');
+  document.getElementById('ne-titulo').value='';
+  document.getElementById('ne-data').value='';
+  document.getElementById('ne-playlist').value='';
+  renderEscalas();
+  toast('✅ Escala criada!');
+}
+
+function saveMembro() {
+  const nome = document.getElementById('nm2-nome').value.trim();
+  if (!nome) { toast('⚠️ Digite o nome'); return; }
+  const funcoes = [...document.querySelectorAll('#nm2-funcoes input:checked')].map(c=>c.value);
+  if (!funcoes.length) { toast('⚠️ Selecione ao menos uma função'); return; }
+  const membros = DB.get('membros',[]);
+  const newId = Math.max(0,...membros.map(m=>m.id))+1;
+  const avs = ['av1','av2','av3','av4','av5','av6'];
+  const iniciais = nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
+  membros.push({
+    id: newId, nome, iniciais,
+    av: avs[newId % avs.length],
+    funcoes,
+    email:  document.getElementById('nm2-email').value.trim(),
+    tel:    document.getElementById('nm2-tel').value.trim(),
+    perm:   document.getElementById('nm2-perm').value,
+    status:'ativo', indisps:[]
+  });
+  DB.set('membros', membros);
+  closeModal('modal-membro');
+  renderMembros();
+  toast('✅ Membro adicionado!');
+}
+
+function changeConfirm(escId, memId, val) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===escId);
+  const m = e.membros.find(x=>x.id===memId);
+  m.confirm = val;
+  DB.set('escalas', escalas);
+  renderEscalaDetail(escId);
+}
+
+function removeMemberFromEscala(escId, memId) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===escId);
+  e.membros = e.membros.filter(m=>m.id!==memId);
+  DB.set('escalas', escalas);
+  renderEscalaDetail(escId);
+  toast('Membro removido da escala');
+}
+
+function addMembroEscala(memId) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  if (e.membros.find(m=>m.id===memId)) return;
+  const membros = DB.get('membros',[]);
+  const m = membros.find(x=>x.id===memId);
+  if (isIndisponivel(m, e.data)) { toast('⚠️ Membro indisponível nesta data'); return; }
+  e.membros.push({ id:memId, confirm:'pendente' });
+  DB.set('escalas', escalas);
+  closeModal('modal-add-membro-escala');
+  renderEscalaDetail(currentEscalaId);
+  toast('✅ Membro adicionado à escala');
+}
+
+function publishEscala() {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  e.status = 'publicada';
+  DB.set('escalas', escalas);
+  renderEscalaDetail(currentEscalaId);
+  toast('📢 Escala publicada!');
+}
+
+/* ================================================================
+   SMALL HELPERS
+================================================================ */
+function statusTag(status) {
+  const map = {
+    publicada: 'tag-green',
+    rascunho:  'tag-gold',
+    planejada: 'tag-purple',
+    realizado: 'tag-muted'
+  };
+  const label = {publicada:'✅ Publicada', rascunho:'🗒 Rascunho', planejada:'📌 Planejada', realizado:'Realizado'};
+  return `<span class="tag ${map[status]||'tag-muted'}">${label[status]||status}</span>`;
+}
+
+function confirmPill(c) {
+  if (c==='confirmado') return '<span class="confirm-pill cp-ok">✓ Confirmado</span>';
+  if (c==='recusado')   return '<span class="confirm-pill cp-no">✗ Recusou</span>';
+  return '<span class="confirm-pill cp-wait">⏳ Pendente</span>';
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const dt = new Date(d+'T00:00:00');
+  return dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+}
+
+function weekDay(d) {
+  const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  return days[new Date(d+'T00:00:00').getDay()];
+}
+
+function escalaDateBadge(data, size) {
+  const d = new Date(data+'T00:00:00');
+  const day = String(d.getDate()).padStart(2,'0');
+  const mon = d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','').toUpperCase();
+  return `<div class="escala-date"><div class="eday">${day}</div><div class="emon">${mon}</div></div>`;
+}
+
+function syncGoogle() {
+  toast('📅 Abrindo autenticação Google... (requer backend para integração completa)');
+}
+
+function shareWhatsApp() {
+  const url = encodeURIComponent('https://escalaworship.app/join/VIDANOVA2026');
+  window.open(`https://wa.me/?text=Entre%20no%20nosso%20minist%C3%A9rio%20no%20EscalaWorship!%20${url}`, '_blank');
+}
+
+function copyText(txt) {
+  navigator.clipboard?.writeText(txt).then(()=>toast('📋 Copiado!')).catch(()=>toast('📋 '+txt));
+}
+
+function toast(msg, dur=2800) {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.style.cssText = 'background:var(--surface);border:1px solid var(--border2);color:var(--text);padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,0.4);pointer-events:auto;animation:fadeIn .2s ease;';
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(()=>t.remove(), dur);
+}
+
+/* ================================================================
+   PWA
+================================================================ */
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('install-banner').style.display='flex';
+});
+
+function installApp() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(r => {
+      if (r.outcome==='accepted') toast('✅ App instalado!');
+      document.getElementById('install-banner').style.display='none';
+      deferredPrompt=null;
+    });
+  } else {
+    toast('📱 No Chrome: menu ⋮ → "Adicionar à tela inicial"');
+  }
+}
+
+function dismissInstall() {
+  document.getElementById('install-banner').style.display='none';
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
+
+/* ================================================================
+   SUPABASE INTEGRATION
+   Quando SUPABASE_URL estiver configurado, o app usa Supabase.
+   Caso contrário, cai para localStorage (modo demo/offline).
+================================================================ */
+
+// ---- Configuração — altere aqui quando tiver o projeto Supabase ----
+const SUPA_URL = 'https://mnmwmgcivxxhlqluuvhw.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubXdtZ2Npdnh4aGxxbHV1dmh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwMjc3ODYsImV4cCI6MjA5MzYwMzc4Nn0.fdmomLG5_dmA6FqcneK0GkjPrvu-xOEryOGUWaZloiM';
+
+const USE_SUPABASE = !!(SUPA_URL && SUPA_KEY);
+
+let supabase = null;
+
+async function initSupabase() {
+  if (!USE_SUPABASE) return false;
+  try {
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+    supabase = createClient(SUPA_URL, SUPA_KEY);
+    return true;
+  } catch(e) {
+    console.error('Supabase não carregou:', e);
+    return false;
+  }
+}
+
+// ---- Tela de Login ----
+function showLogin() {
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function hideLogin() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'flex';
+}
+
+async function loginGoogle() {
+  if (!supabase) { hideLogin(); seedData(); navigate('dashboard'); return; }
+  try {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    });
+  } catch(e) { toast('❌ Erro no login: ' + e.message); }
+}
+
+async function loginEmail() {
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  if (!email || !senha) { toast('⚠️ Preencha email e senha'); return; }
+  if (!supabase) { hideLogin(); seedData(); navigate('dashboard'); return; }
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    if (error) throw error;
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+async function registrar() {
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  const nome  = document.getElementById('login-nome')?.value?.trim() || '';
+  if (!email || !senha) { toast('⚠️ Preencha email e senha'); return; }
+  if (!supabase) { hideLogin(); seedData(); navigate('dashboard'); return; }
+  try {
+    const { error } = await supabase.auth.signUp({ email, password: senha, options: { data: { nome } } });
+    if (error) throw error;
+    toast('✅ Verifique seu email para confirmar o cadastro!');
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+function toggleLoginForm() {
+  const extra = document.getElementById('login-extra');
+  const btn   = document.getElementById('login-toggle-btn');
+  if (extra.style.display === 'none') {
+    extra.style.display = '';
+    btn.textContent = 'Já tenho conta → Entrar';
+    document.getElementById('login-main-btn').textContent = 'Criar conta';
+    document.getElementById('login-main-btn').onclick = registrar;
+  } else {
+    extra.style.display = 'none';
+    btn.textContent = 'Criar conta';
+    document.getElementById('login-main-btn').textContent = 'Entrar';
+    document.getElementById('login-main-btn').onclick = loginEmail;
+  }
+}
+
+async function entrarComCodigo() {
+  const codigo = document.getElementById('login-codigo').value.trim().toUpperCase();
+  if (!codigo) { toast('⚠️ Digite o código'); return; }
+  if (!supabase) { hideLogin(); seedData(); navigate('dashboard'); return; }
+  // Em produção: busca o ministério pelo código e vincula o membro
+  toast('🔗 Buscando ministério...');
+  try {
+    const { data, error } = await supabase
+      .from('ministerios')
+      .select('nome')
+      .eq('codigo', codigo)
+      .single();
+    if (error) throw new Error('Código inválido');
+    toast(`✅ Ministério "${data.nome}" encontrado! Faça login para continuar.`);
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+// ---- Após login: carrega membro e ministério do Supabase ----
+async function afterLogin(session) {
+  if (!session || !supabase) {
+    hideLogin(); seedData(); navigate('dashboard'); return;
+  }
+  try {
+    // Busca membro vinculado ao user
+    const { data: membro } = await supabase
+      .from('membros')
+      .select('*, ministerios(*)')
+      .eq('user_id', session.user.id)
+      .single();
+
+    if (membro) {
+      // Carrega dados do Supabase no DB local (para compatibilidade com o app)
+      await syncFromSupabase(membro);
+      hideLogin();
+      navigate('dashboard');
+    } else {
+      // Membro novo — vai para tela de seleção de ministério
+      hideLogin();
+      toast('👋 Bem-vindo! Entre com um código de convite ou crie um novo ministério.');
+      openModal('modal-invite');
+      navigate('dashboard');
+    }
+  } catch(e) {
+    console.error(e);
+    hideLogin(); seedData(); navigate('dashboard');
+  }
+}
+
+// ---- Sincroniza dados do Supabase para o cache local ----
+async function syncFromSupabase(membro) {
+  if (!supabase) return;
+  try {
+    const minId = membro.ministerio_id;
+
+    // Membros
+    const { data: membros } = await supabase.from('membros').select('*').eq('ministerio_id', minId);
+    if (membros) DB.set('membros', membros.map(adaptMembro));
+
+    // Escalas
+    const { data: escalas } = await supabase.from('escalas')
+      .select('*, escala_membros(membro_id, confirmacao), escala_slots(*), sugestoes(*)')
+      .eq('ministerio_id', minId)
+      .order('data_evento');
+    if (escalas) DB.set('escalas', escalas.map(adaptEscala));
+
+    // Músicas
+    const { data: musicas } = await supabase.from('musicas').select('*').eq('ministerio_id', minId);
+    if (musicas) DB.set('musicas', musicas.map(adaptMusica));
+
+    // Avisos
+    const { data: avisos } = await supabase.from('avisos').select('*, membros!autor_id(nome)').eq('ministerio_id', minId).order('criado_em', {ascending: false});
+    if (avisos) DB.set('avisos', avisos.map(adaptAviso));
+
+    // Chat
+    const { data: chat } = await supabase.from('chat_mensagens').select('*, membros!autor_id(id, nome, iniciais, avatar_cor)').eq('ministerio_id', minId).order('criado_em').limit(50);
+    if (chat) DB.set('chat', chat.map(adaptChat));
+
+    DB.set('seeded', true);
+
+    // Realtime chat
+    subscribeRealtime(minId, membro.id);
+  } catch(e) {
+    console.error('Sync falhou, usando dados locais:', e);
+    seedData();
+  }
+}
+
+// ---- Adapters: Supabase → formato local do app ----
+function adaptMembro(m) {
+  return { id: m.id, nome: m.nome, iniciais: m.iniciais || (m.nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase()),
+    av: m.avatar_cor || 'av1', funcao: m.funcao, email: m.email || '', tel: m.telefone || '',
+    perm: m.permissao, status: m.status, indisps: [] };
+}
+
+function adaptEscala(e) {
+  return {
+    id: e.id, titulo: e.titulo,
+    data: e.data_evento, hora: e.hora_evento?.slice(0,5),
+    status: e.status, obs: e.observacoes || '',
+    membros: (e.escala_membros || []).map(em => ({ id: em.membro_id, confirm: em.confirmacao })),
+    slots: (e.escala_slots || []).sort((a,b)=>a.posicao-b.posicao).map(s => ({
+      pos: s.posicao, nome: s.nome || '', artista: s.artista || '',
+      tom: s.tom || '', bpm: s.bpm || '', tipo: s.tipo_especial || '',
+      spotify: s.link_spotify || '', youtube: s.link_youtube || '',
+      cifra: s.link_cifra || '', escolhidoPor: s.escolhido_por, _id: s.id
+    })),
+    sugestoes: (e.sugestoes || []).map(s => ({
+      id: s.id, nome: s.nome, artista: s.artista || '',
+      por: s.sugerido_por, status: s.status, aprovadoPor: s.aprovado_por
+    }))
+  };
+}
+
+function adaptMusica(m) {
+  return { id: m.id, titulo: m.titulo, artista: m.artista || '', tom: m.tom || '',
+    bpm: m.bpm || '', pasta: m.pasta || 'Sem pasta', spotify: m.link_spotify || '',
+    youtube: m.link_youtube || '', cifra: m.link_cifra || '' };
+}
+
+function adaptAviso(a) {
+  const d = new Date(a.criado_em);
+  return { id: a.id, titulo: a.titulo, msg: a.mensagem, tipo: a.tipo,
+    por: a.membros?.nome || 'Sistema',
+    quando: d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) };
+}
+
+function adaptChat(c) {
+  const d = new Date(c.criado_em);
+  return { id: c.id, de: c.membros?.iniciais || '??', av: c.membros?.avatar_cor || 'av1',
+    msg: c.mensagem, hora: d.getHours()+':'+String(d.getMinutes()).padStart(2,'0'), mine: false };
+}
+
+// ---- Realtime subscriptions ----
+function subscribeRealtime(minId, membroId) {
+  if (!supabase) return;
+
+  // Chat em tempo real
+  supabase.channel(`chat:${minId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensagens',
+      filter: `ministerio_id=eq.${minId}` },
+      payload => {
+        const msgs = DB.get('chat', []);
+        const novo = adaptChat(payload.new);
+        novo.mine = payload.new.autor_id === membroId;
+        msgs.push(novo);
+        DB.set('chat', msgs);
+        const chatView = document.getElementById('view-chat');
+        if (chatView?.classList.contains('active')) renderChat();
+      })
+    .subscribe();
+
+  // Slots em tempo real
+  supabase.channel(`slots:all`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'escala_slots' },
+      () => {
+        // Recarrega escala atual se estiver na tela de detalhe
+        const detailView = document.getElementById('view-escala-detail');
+        if (detailView?.classList.contains('active') && currentEscalaId) {
+          renderSlots();
+        }
+      })
+    .subscribe();
+}
+
+// ---- Sobrescreve saveSlot para gravar no Supabase também ----
+const _saveSlotOrig = saveSlot;
+window.saveSlot = async function() {
+  _saveSlotOrig();
+  if (!supabase || !currentEscalaId) return;
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const s = e?.slots?.find(x=>x.pos===editingSlotPos);
+  if (!s?._id) return;
+  try {
+    await supabase.from('escala_slots').update({
+      nome: s.nome, artista: s.artista, tom: s.tom, bpm: s.bpm || null,
+      tipo_especial: s.tipo, link_spotify: s.spotify,
+      link_youtube: s.youtube, link_cifra: s.cifra,
+      escolhido_por: s.escolhidoPor
+    }).eq('id', s._id);
+  } catch(e) { console.warn('Slot sync falhou:', e); }
+};
+
+/* ================================================================
+   INIT
+================================================================ */
+async function init() {
+  const hasSupa = await initSupabase();
+
+  if (hasSupa) {
+    // Supabase disponível — verifica sessão
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await afterLogin(session);
+    } else {
+      showLogin();
+    }
+    // Escuta mudanças de auth (callback após OAuth redirect)
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session && document.getElementById('login-screen').style.display !== 'none') {
+        await afterLogin(session);
+      }
+    });
+  } else {
+    // Modo offline / demo — usa localStorage
+    seedData();
+    navigate('dashboard');
+  }
+}
+
+init();
+</script>
+
+<!-- ================================================================
+     TELA DE LOGIN (só aparece quando Supabase está configurado)
+================================================================ -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:400px;">
+    <!-- Logo -->
+    <div style="text-align:center;margin-bottom:32px;">
+      <img src="logo.png" alt="EscalaWorship" style="width:90px;height:90px;object-fit:contain;margin:0 auto 10px;display:block;filter:brightness(1.05);">
+      <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;background:linear-gradient(90deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">EscalaWorship</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">Gestão de ministério de louvor</div>
+    </div>
+
+    <!-- Card login -->
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:18px;padding:24px;">
+      <!-- Google -->
+      <button onclick="loginGoogle()" style="width:100%;padding:11px;border-radius:10px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg>
+        Entrar com Google
+      </button>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+        <span style="font-size:11px;color:var(--muted);">ou email</span>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+      </div>
+
+      <!-- Nome (só no cadastro) -->
+      <div id="login-extra" style="display:none;margin-bottom:12px;">
+        <input class="form-input" id="login-nome" placeholder="Seu nome completo">
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <input class="form-input" id="login-email" type="email" placeholder="Email">
+      </div>
+      <div style="margin-bottom:14px;">
+        <input class="form-input" id="login-senha" type="password" placeholder="Senha">
+      </div>
+
+      <button id="login-main-btn" onclick="loginEmail()" style="width:100%;padding:11px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#b8943e);color:#fff;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;">Entrar</button>
+
+      <button id="login-toggle-btn" onclick="toggleLoginForm()" style="width:100%;padding:8px;background:transparent;border:none;color:var(--muted);font-size:12.5px;cursor:pointer;">Criar conta</button>
+
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center;">Entrar com código de convite</div>
+        <div style="display:flex;gap:8px;">
+          <input class="form-input" id="login-codigo" placeholder="Ex: VIDA26" style="text-transform:uppercase;letter-spacing:2px;font-weight:700;text-align:center;">
+          <button onclick="entrarComCodigo()" class="btn btn-ghost btn-sm">Entrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modo demo -->
+    <div style="text-align:center;margin-top:14px;">
+      <button onclick="hideLogin();seedData();navigate('dashboard');" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;">Usar em modo demo (sem login)</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL wrapper (para esconder enquanto não logou) -->
+<script>
+// Envolve o body content no app-shell
+// (já renderizado acima — só precisamos do id para show/hide)
+document.querySelector('.sidebar').closest('body').id = '';
+const appParts = [...document.querySelectorAll('.sidebar, .main, #install-banner, #toast-container, .overlay-bg')];
+const shell = document.createElement('div');
+shell.id = 'app-shell';
+shell.style.cssText = 'display:flex;width:100%;height:100%;overflow:hidden;';
+appParts.forEach(el => shell.appendChild(el));
+document.body.insertBefore(shell, document.body.firstChild);
+</script>
+</body>
+</html>

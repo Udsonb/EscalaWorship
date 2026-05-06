@@ -1,0 +1,8 @@
+# Não enviar para o GitHub
+files.zip
+Rev0/
+node_modules/
+.env
+.env.local
+.DS_Store
+Thumbs.db
