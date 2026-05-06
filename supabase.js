@@ -12,8 +12,8 @@
 // ============================================================
 // CONFIG — ALTERE AQUI
 // ============================================================
-const SUPABASE_URL      = 'https://SEU-PROJETO.supabase.co';
-const SUPABASE_ANON_KEY = 'SUA-ANON-KEY-AQUI';
+const SUPABASE_URL      = 'https://mnmwmgcivxxhlqluuvhw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubXdtZ2Npdnh4aGxxbHV1dmh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwMjc3ODYsImV4cCI6MjA5MzYwMzc4Nn0.fdmomLG5_dmA6FqcneK0GkjPrvu-xOEryOGUWaZloiM';
 
 // ============================================================
 // CLIENTE
