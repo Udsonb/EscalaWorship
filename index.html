@@ -987,6 +987,15 @@ body {
         </div>
       </div>
 
+      <!-- Playlist -->
+      <div class="card mb16" id="esc-playlist-card">
+        <div class="card-header">
+          <h3>🎧 Playlist do Dia</h3>
+          <button class="btn btn-ghost btn-xs" onclick="editPlaylist()">✏️ Editar</button>
+        </div>
+        <div class="card-body" id="esc-playlist-wrap"></div>
+      </div>
+
       <!-- Repertório da Escala -->
       <div class="card mb16">
         <div class="card-header">
@@ -1176,6 +1185,12 @@ body {
           </div>
           <div class="sec-title">Funções cadastradas</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;" id="funcoes-list"></div>
+
+          <div class="sec-title" style="margin-top:20px;">Cultos da Semana</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Dias e horários dos cultos regulares — aparecem marcados no calendário ao criar escalas.</div>
+          <div id="cultos-regulares-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
+          <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-culto')" style="margin-bottom:20px;">+ Adicionar culto</button>
+
           <button class="btn btn-primary" onclick="toast('✅ Salvo!')">Salvar alterações</button>
         </div>
       </div>
@@ -1188,35 +1203,88 @@ body {
      MODAIS
 ================================================================ -->
 
-<!-- Modal Nova Escala -->
+<!-- Modal Nova Escala — 3 etapas -->
 <div class="modal-overlay" id="modal-escala">
-  <div class="modal">
+
+  <!-- Etapa 1: Calendário -->
+  <div class="modal" id="cal-step1" style="max-width:500px;">
     <div class="modal-header">
-      <h2>📋 Nova Escala</h2>
+      <div>
+        <h2>📅 Nova Escala</h2>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">Toque na data do culto</div>
+      </div>
       <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-escala')">✕</button>
     </div>
+    <div class="modal-body" style="padding-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <button class="btn btn-ghost btn-sm" onclick="calPrevMes()">◀</button>
+        <span id="cal-mes-label" style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;"></span>
+        <button class="btn btn-ghost btn-sm" onclick="calNextMes()">▶</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:6px;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);padding:4px 0;">Dom</div>
+        <div style="font-size:10px;font-weight:700;color:var(--muted);padding:4px 0;">Seg</div>
+        <div style="font-size:10px;font-weight:700;color:var(--muted);padding:4px 0;">Ter</div>
+        <div style="font-size:10px;font-weight:700;color:var(--muted);padding:4px 0;">Qua</div>
+        <div style="font-size:10px;font-weight:700;color:var(--muted);padding:4px 0;">Qui</div>
+        <div style="font-size:10px;font-weight:700;color:var(--muted);padding:4px 0;">Sex</div>
+        <div style="font-size:10px;font-weight:700;color:var(--muted);padding:4px 0;">Sáb</div>
+      </div>
+      <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:14px;"></div>
+      <div id="cal-legend" style="display:flex;flex-wrap:wrap;gap:10px;padding-top:12px;border-top:1px solid var(--border);min-height:28px;"></div>
+    </div>
+  </div>
+
+  <!-- Etapa 2: Selecionar culto (quando há 2+ no mesmo dia) -->
+  <div class="modal" id="cal-step2" style="display:none;max-width:380px;">
+    <div class="modal-header">
+      <div>
+        <h2>🕐 Qual culto?</h2>
+        <div id="cal-data-label" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="showCalStep(1)">← Voltar</button>
+    </div>
+    <div class="modal-body" id="cal-cultos-list"></div>
+  </div>
+
+  <!-- Etapa 3: Confirmar detalhes -->
+  <div class="modal" id="cal-step3" style="display:none;max-width:430px;">
+    <div class="modal-header">
+      <div>
+        <h2>✅ Confirmar Escala</h2>
+        <div id="cal-resumo" style="font-size:12px;color:var(--accent);font-weight:600;margin-top:2px;"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="showCalStep(1)">← Voltar</button>
+    </div>
     <div class="modal-body">
-      <div class="form-group"><label class="form-label">Título do evento *</label><input class="form-input" id="ne-titulo" placeholder="Ex: Culto Domingo Manhã"></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Data *</label><input class="form-input" id="ne-data" type="date"></div>
-        <div class="form-group"><label class="form-label">Horário *</label><input class="form-input" id="ne-hora" type="time" value="09:00"></div>
+      <!-- Hidden fields preenchidos pela lógica do calendário -->
+      <input type="hidden" id="ne-data">
+      <input type="hidden" id="ne-hora">
+      <input type="hidden" id="ne-titulo">
+      <!-- Campos extras para dias livres (congressos/especiais) -->
+      <div id="cal-manual-fields" style="display:none;">
+        <div class="form-group"><label class="form-label">Título do evento *</label><input class="form-input" id="ne-titulo-manual" placeholder="Ex: Congresso de Jovens"></div>
+        <div class="form-group"><label class="form-label">Horário *</label><input class="form-input" id="ne-hora-manual" type="time" value="19:00"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Status inicial</label>
+        <label class="form-label">Status</label>
         <select class="form-select" id="ne-status">
-          <option value="rascunho">🗒 Rascunho (visível só para gestores)</option>
+          <option value="rascunho">🗒 Rascunho</option>
           <option value="planejada">📌 Planejada</option>
-          <option value="publicada">✅ Publicada</option>
+          <option value="publicada" selected>✅ Publicada</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">Observações</label><textarea class="form-textarea" id="ne-obs" placeholder="Instruções para os membros..."></textarea></div>
-      <div class="form-group"><label class="form-label">🎧 Playlist do dia (opcional)</label><input class="form-input" id="ne-playlist" placeholder="https://open.spotify.com/playlist/..."></div>
+      <div class="form-group">
+        <label class="form-label">Observações</label>
+        <textarea class="form-textarea" id="ne-obs" placeholder="Tema do culto, instruções..." rows="2"></textarea>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-escala')">Cancelar</button>
-      <button class="btn btn-primary" onclick="createEscala()">Criar Escala</button>
+      <button class="btn btn-primary" onclick="createEscala()">🪑 Criar e preencher cadeiras</button>
     </div>
   </div>
+
 </div>
 
 <!-- Modal: Adicionar/Editar Slot -->
@@ -1494,6 +1562,55 @@ body {
   </div>
 </div>
 
+<!-- Modal: Adicionar Culto Regular -->
+<div class="modal-overlay" id="modal-add-culto">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <h2>📅 Culto Regular</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-add-culto')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Dia da semana</label>
+        <select class="form-select" id="nc-dia">
+          <option value="0">Domingo</option>
+          <option value="1">Segunda-feira</option>
+          <option value="2">Terça-feira</option>
+          <option value="3">Quarta-feira</option>
+          <option value="4" selected>Quinta-feira</option>
+          <option value="5">Sexta-feira</option>
+          <option value="6">Sábado</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Horário</label>
+          <input class="form-input" id="nc-hora" type="time" value="19:00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cor no calendário</label>
+          <select class="form-select" id="nc-cor">
+            <option value="#c9a76a">🟡 Dourado</option>
+            <option value="#60a5fa">🔵 Azul</option>
+            <option value="#34d399">🟢 Verde</option>
+            <option value="#f87171">🔴 Vermelho</option>
+            <option value="#a78bfa">🟣 Roxo</option>
+            <option value="#fb923c">🟠 Laranja</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nome do culto</label>
+        <input class="form-input" id="nc-nome" placeholder="Ex: Culto de Domingo, Reunião de Oração...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-culto')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarCultoRegular()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Install PWA Banner -->
 <div id="install-banner" style="display:none;">
   <div>
@@ -1663,6 +1780,7 @@ function handleMainAction() {
   const pg = Object.keys(NAV_CFG).find(k => NAV_CFG[k].title === document.getElementById('page-title').textContent);
   if (!pg || !NAV_CFG[pg].modal) return;
   if (NAV_CFG[pg].modal === 'modal-membro') { openNovoMembro(); return; }
+  if (NAV_CFG[pg].modal === 'modal-escala') { abrirCalendarioEscala(); return; }
   openModal(NAV_CFG[pg].modal);
 }
 
@@ -1815,6 +1933,14 @@ function renderEscalaDetail(id) {
   renderCadeiras();
   renderConfirmSummary();
 
+  // Playlist section
+  const pw = document.getElementById('esc-playlist-wrap');
+  if (pw) pw.innerHTML = e.playlist
+    ? `<div style="display:flex;align-items:center;gap:10px;">
+        <a href="${e.playlist}" target="_blank" class="link-chip lc-spotify" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🎧 Abrir playlist</a>
+       </div>`
+    : `<div style="font-size:12px;color:var(--muted);font-style:italic;">Nenhuma playlist adicionada ainda.</div>`;
+
   // Slots count
   const mainSlots = (e.slots||[]).filter(s=>s.tipo!=='ofertorio'&&s.tipo!=='santa-ceia');
   document.getElementById('esc-slots-count').textContent = `${mainSlots.filter(s=>s.nome).length}/${mainSlots.length} músicas`;
@@ -1942,14 +2068,17 @@ function abrirCadeiraPicker(idx) {
   document.getElementById('modal-cadeira-list').innerHTML = candidatos.length
     ? candidatos.map(m => {
         const indisp = isIndisponivel(m, e.data);
-        const jaEmOutraCadeira = e.cadeiras.some((cc,i) => i !== idx && cc.membroId === m.id);
-        return `<div class="member-row" style="cursor:pointer;${indisp?'background:rgba(248,113,113,0.06);':''}" onclick="atribuirMembroCadeira(${m.id})">
+        const jaEmOutraCadeira = e.cadeiras.some((cc,i) => i !== idx && String(cc.membroId) === String(m.id));
+        return `<div class="member-row" style="${indisp?'background:rgba(248,113,113,0.06);':''}">
           <div class="avatar ${m.av}" style="${indisp?'border:2px solid var(--red);':''}">${m.iniciais}</div>
-          <div class="m-info">
+          <div class="m-info" style="flex:1;">
             <div class="name">${m.nome}${jaEmOutraCadeira?'<span style="font-size:10px;color:var(--gold);margin-left:6px;">⚠ já escalado</span>':''}</div>
             <div class="role">${indisp?'🚫 Indisponível nesta data':'✅ Disponível'}</div>
           </div>
-          ${indisp ? '<span class="tag tag-red" style="flex-shrink:0;">🚫 Indisp.</span>' : '<button class="btn btn-ghost btn-xs" style="flex-shrink:0;">Escalar</button>'}
+          ${indisp
+            ? `<span class="tag tag-red" style="flex-shrink:0;">🚫 Indisp.</span>
+               <button class="btn btn-ghost btn-xs" style="flex-shrink:0;" onclick="atribuirMembroCadeira('${m.id}')">Escalar mesmo</button>`
+            : `<button class="btn btn-primary btn-xs" style="flex-shrink:0;" onclick="atribuirMembroCadeira('${m.id}')">Escalar</button>`}
         </div>`;
       }).join('')
     : `<div class="empty-state"><p>Nenhum membro cadastrado toca ${c.funcao}</p></div>`;
@@ -1957,7 +2086,12 @@ function abrirCadeiraPicker(idx) {
   openModal('modal-cadeira-picker');
 }
 
-function atribuirMembroCadeira(memId) {
+function atribuirMembroCadeira(memIdRaw) {
+  const membros = DB.get('membros',[]);
+  const m = membros.find(x => String(x.id) === String(memIdRaw));
+  if (!m) { toast('⚠️ Membro não encontrado'); return; }
+  const memId = m.id;
+
   const escalas = DB.get('escalas',[]);
   const e = escalas.find(x=>x.id===currentEscalaId);
   const c = e.cadeiras[currentCadeiraIdx];
@@ -1965,13 +2099,13 @@ function atribuirMembroCadeira(memId) {
 
   c.membroId = memId;
 
-  if (!e.membros.find(m=>m.id===memId)) {
+  if (!e.membros.find(x => String(x.id) === String(memId))) {
     e.membros.push({ id: memId, confirm: 'pendente' });
   }
 
-  if (prevId && prevId !== memId) {
-    const stillInOther = e.cadeiras.some(cc => cc.membroId === prevId);
-    if (!stillInOther) e.membros = e.membros.filter(m=>m.id!==prevId);
+  if (prevId && String(prevId) !== String(memId)) {
+    const stillInOther = e.cadeiras.some(cc => String(cc.membroId) === String(prevId));
+    if (!stillInOther) e.membros = e.membros.filter(x => String(x.id) !== String(prevId));
   }
 
   DB.set('escalas', escalas);
@@ -1986,8 +2120,8 @@ function removerDaCadeira(idx) {
   const e = escalas.find(x=>x.id===currentEscalaId);
   const memId = e.cadeiras[idx].membroId;
   e.cadeiras[idx].membroId = null;
-  const stillInOther = e.cadeiras.some(cc => cc.membroId === memId);
-  if (!stillInOther) e.membros = e.membros.filter(m=>m.id!==memId);
+  const stillInOther = e.cadeiras.some(cc => String(cc.membroId) === String(memId));
+  if (!stillInOther) e.membros = e.membros.filter(x => String(x.id) !== String(memId));
   DB.set('escalas', escalas);
   renderCadeiras();
   renderConfirmSummary();
@@ -2069,15 +2203,6 @@ function renderSlots() {
   const oferta = e.oferta || { nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', escolhidoPor:null };
   const santaCeia = isFirstSunday(e.data);
 
-  // Playlist link
-  const playlistHtml = e.playlist
-    ? `<div style="margin-bottom:12px;padding:10px 14px;background:rgba(30,215,96,0.07);border:1px solid rgba(30,215,96,0.2);border-radius:var(--r-sm);display:flex;align-items:center;gap:10px;">
-        <span style="font-size:13px;font-weight:600;">🎧 Playlist do dia:</span>
-        <a href="${e.playlist}" target="_blank" class="link-chip lc-spotify" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Abrir playlist</a>
-        <button class="btn btn-ghost btn-xs" onclick="editPlaylist()">✏️</button>
-      </div>`
-    : `<button class="btn btn-ghost btn-sm" style="margin-bottom:12px;" onclick="editPlaylist()">🎧 + Adicionar playlist do dia</button>`;
-
   // Repertório principal
   const slotsHtml = slots.map(s => `
     <div class="slot-wrap" id="slot-${s.pos}">
@@ -2112,7 +2237,6 @@ function renderSlots() {
     </div>` : '';
 
   document.getElementById('slots-list').innerHTML = `
-    ${playlistHtml}
     <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:8px 0 6px;">🎵 Repertório Principal</div>
     ${slotsHtml}
     <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 6px;">Seções Especiais</div>
@@ -2594,6 +2718,176 @@ function calDayClick(d) {
 }
 
 /* ================================================================
+   CALENDÁRIO — Nova Escala
+================================================================ */
+let calMonth = new Date(); // first day of displayed month
+
+function abrirCalendarioEscala() {
+  calMonth = new Date();
+  calMonth.setDate(1);
+  showCalStep(1);
+  renderCalendario();
+  openModal('modal-escala');
+}
+
+function showCalStep(n) {
+  document.getElementById('cal-step1').style.display = n === 1 ? '' : 'none';
+  document.getElementById('cal-step2').style.display = n === 2 ? '' : 'none';
+  document.getElementById('cal-step3').style.display = n === 3 ? '' : 'none';
+}
+
+function calPrevMes() { calMonth.setMonth(calMonth.getMonth() - 1); renderCalendario(); }
+function calNextMes() { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendario(); }
+
+function renderCalendario() {
+  const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const cultos = DB.get('cultos_regulares', []);
+  const ano = calMonth.getFullYear();
+  const mes = calMonth.getMonth();
+  document.getElementById('cal-mes-label').textContent = `${MESES[mes]} ${ano}`;
+
+  const primeiroDia = new Date(ano, mes, 1).getDay(); // 0=Dom
+  const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+  const hoje = new Date();
+
+  let html = '';
+  for (let i = 0; i < primeiroDia; i++) html += '<div></div>';
+
+  for (let d = 1; d <= diasNoMes; d++) {
+    const diaSemana = new Date(ano, mes, d).getDay();
+    const dataStr = `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const cultosDia = cultos.filter(c => c.dia === diaSemana);
+    const isHoje = (d === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear());
+
+    const cor = cultosDia.length === 1 ? cultosDia[0].cor
+              : cultosDia.length > 1   ? 'var(--accent)'
+              : null;
+    const bgStyle = cor ? `background:${cor}18;border:1.5px solid ${cor}55;` : 'border:1px solid var(--border);';
+    const hoverStyle = cor ? `onmouseover="this.style.background='${cor}30'" onmouseout="this.style.background='${cor}18'"`
+                           : `onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"`;
+    const todayStyle = isHoje ? 'outline:2px solid var(--accent);outline-offset:1px;' : '';
+    const dots = cultosDia.map(c => `<div style="width:5px;height:5px;border-radius:50%;background:${c.cor};margin:0 1px;"></div>`).join('');
+
+    html += `<div onclick="selecionarDiaCalendario('${dataStr}')" ${hoverStyle}
+      style="text-align:center;padding:6px 2px;cursor:pointer;border-radius:8px;${bgStyle}${todayStyle}min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:background 0.1s;">
+      <div style="font-size:13px;font-weight:${isHoje?'800':cultosDia.length?'700':'400'};color:${cor||'var(--text2)'};">${d}</div>
+      <div style="display:flex;justify-content:center;">${dots}</div>
+    </div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+
+  // Legend
+  const legend = cultos.length
+    ? cultos.map(c => {
+        const dias = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+        return `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);">
+          <div style="width:10px;height:10px;border-radius:50%;background:${c.cor};flex-shrink:0;"></div>
+          ${c.nome} — ${dias[c.dia]} ${c.hora}
+        </div>`;
+      }).join('')
+    : `<div style="font-size:11px;color:var(--muted);">Nenhum culto regular cadastrado. Configure em Ministério → Cultos da Semana.</div>`;
+  document.getElementById('cal-legend').innerHTML = legend;
+}
+
+function selecionarDiaCalendario(dataStr) {
+  const cultos = DB.get('cultos_regulares', []);
+  const diaSemana = new Date(dataStr + 'T12:00:00').getDay();
+  const cultosDia = cultos.filter(c => c.dia === diaSemana);
+
+  document.getElementById('ne-data').value = dataStr;
+
+  if (cultosDia.length === 0) {
+    // Dia livre — mostrar campos manuais
+    const fmt = new Date(dataStr + 'T12:00:00').toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long'});
+    document.getElementById('cal-resumo').textContent = fmt;
+    document.getElementById('cal-manual-fields').style.display = '';
+    document.getElementById('ne-titulo').value = '';
+    document.getElementById('ne-hora').value = '19:00';
+    showCalStep(3);
+  } else if (cultosDia.length === 1) {
+    const c = cultosDia[0];
+    document.getElementById('ne-titulo').value = c.nome;
+    document.getElementById('ne-hora').value = c.hora;
+    const fmt = new Date(dataStr + 'T12:00:00').toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long'});
+    document.getElementById('cal-resumo').textContent = `${fmt} • ${c.hora} — ${c.nome}`;
+    document.getElementById('cal-manual-fields').style.display = 'none';
+    showCalStep(3);
+  } else {
+    // Múltiplos cultos — mostrar seletor
+    const fmt = new Date(dataStr + 'T12:00:00').toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long'});
+    document.getElementById('cal-data-label').textContent = fmt;
+    document.getElementById('cal-cultos-list').innerHTML = cultosDia.map(c =>
+      `<div onclick="confirmarCultoCalendario('${dataStr}','${c.hora}','${c.nome.replace(/'/g,"\\'")}') "
+        style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface2);border-radius:var(--r-sm);cursor:pointer;margin-bottom:8px;border:1px solid var(--border2);"
+        onmouseover="this.style.borderColor='${c.cor}'" onmouseout="this.style.borderColor='var(--border2)'">
+        <div style="width:12px;height:12px;border-radius:50%;background:${c.cor};flex-shrink:0;"></div>
+        <div>
+          <div style="font-weight:600;font-size:14px;">${c.nome}</div>
+          <div style="font-size:12px;color:var(--muted);">${c.hora}</div>
+        </div>
+        <div style="margin-left:auto;font-size:12px;color:var(--accent);">Selecionar →</div>
+      </div>`
+    ).join('');
+    showCalStep(2);
+  }
+}
+
+function confirmarCultoCalendario(dataStr, hora, nome) {
+  document.getElementById('ne-hora').value = hora;
+  document.getElementById('ne-titulo').value = nome;
+  const fmt = new Date(dataStr + 'T12:00:00').toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long'});
+  document.getElementById('cal-resumo').textContent = `${fmt} • ${hora} — ${nome}`;
+  document.getElementById('cal-manual-fields').style.display = 'none';
+  showCalStep(3);
+}
+
+/* ================================================================
+   MINISTÉRIO — Cultos Regulares
+================================================================ */
+function renderCultosRegulares() {
+  const cultos = DB.get('cultos_regulares', []);
+  const dias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  document.getElementById('cultos-regulares-list').innerHTML = cultos.length
+    ? cultos.map(c =>
+        `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface2);border-radius:var(--r-sm);border:1px solid var(--border2);">
+          <div style="width:12px;height:12px;border-radius:50%;background:${c.cor};flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;">${c.nome}</div>
+            <div style="font-size:11px;color:var(--muted);">${dias[c.dia]} • ${c.hora}</div>
+          </div>
+          <button onclick="removeCultoRegular(${c.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;" title="Remover">×</button>
+        </div>`
+      ).join('')
+    : '<div style="font-size:12px;color:var(--muted);font-style:italic;">Nenhum culto cadastrado ainda.</div>';
+}
+
+function salvarCultoRegular() {
+  const nome = document.getElementById('nc-nome').value.trim();
+  if (!nome) { toast('⚠️ Digite o nome do culto'); return; }
+  const cultos = DB.get('cultos_regulares', []);
+  const newId = Math.max(0, ...cultos.map(c=>c.id||0)) + 1;
+  cultos.push({
+    id: newId,
+    dia:  Number(document.getElementById('nc-dia').value),
+    hora: document.getElementById('nc-hora').value,
+    nome,
+    cor:  document.getElementById('nc-cor').value
+  });
+  DB.set('cultos_regulares', cultos);
+  closeModal('modal-add-culto');
+  document.getElementById('nc-nome').value = '';
+  renderCultosRegulares();
+  toast('✅ Culto adicionado!');
+}
+
+function removeCultoRegular(id) {
+  const cultos = DB.get('cultos_regulares', []).filter(c => c.id !== id);
+  DB.set('cultos_regulares', cultos);
+  renderCultosRegulares();
+  toast('Culto removido');
+}
+
+/* ================================================================
    MINISTÉRIO
 ================================================================ */
 const TODAS_FUNCOES = [
@@ -2604,6 +2898,7 @@ const TODAS_FUNCOES = [
 ];
 
 function renderMinisterio() {
+  renderCultosRegulares();
   const ativas = DB.get('ministerio_funcoes', FUNCOES_LISTA);
   document.getElementById('funcoes-list').innerHTML = ativas.map(f =>
     `<span class="tag tag-purple" style="padding:5px 10px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">
@@ -2659,10 +2954,18 @@ function openNovoMembro() {
    HELPERS
 ================================================================ */
 function createEscala() {
-  const titulo = document.getElementById('ne-titulo').value.trim();
-  const data   = document.getElementById('ne-data').value;
-  const hora   = document.getElementById('ne-hora').value;
-  if (!titulo || !data) { toast('⚠️ Preencha título e data'); return; }
+  let titulo = document.getElementById('ne-titulo').value;
+  let hora   = document.getElementById('ne-hora').value;
+  const data = document.getElementById('ne-data').value;
+
+  // If manual fields are shown (special/free day)
+  const manualDiv = document.getElementById('cal-manual-fields');
+  if (manualDiv && manualDiv.style.display !== 'none') {
+    titulo = document.getElementById('ne-titulo-manual').value.trim();
+    hora   = document.getElementById('ne-hora-manual').value;
+  }
+
+  if (!titulo || !data) { toast('⚠️ Selecione uma data no calendário'); return; }
 
   const escalas = DB.get('escalas',[]);
   const newId = Math.max(0,...escalas.map(e=>e.id))+1;
@@ -2672,7 +2975,7 @@ function createEscala() {
     id: newId, titulo, data, hora,
     status: document.getElementById('ne-status').value,
     obs: document.getElementById('ne-obs').value.trim(),
-    playlist: document.getElementById('ne-playlist').value.trim(),
+    playlist: '',
     membros: [],
     cadeiras: funcoes.map(f => ({ funcao: f, membroId: null })),
     oferta: { nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', escolhidoPor:null },
@@ -2681,11 +2984,10 @@ function createEscala() {
   });
   DB.set('escalas', escalas);
   closeModal('modal-escala');
-  document.getElementById('ne-titulo').value='';
-  document.getElementById('ne-data').value='';
-  document.getElementById('ne-playlist').value='';
+  document.getElementById('ne-obs').value = '';
   renderEscalas();
-  toast('✅ Escala criada!');
+  navigate('escala-detail', newId);
+  toast('✅ Escala criada! Preencha as cadeiras 🪑');
 }
 
 function saveMembro() {
