@@ -952,13 +952,13 @@ body {
       </div>
 
       <div class="grid2 mb20">
-        <!-- Membros escalados -->
+        <!-- Cadeiras -->
         <div class="card">
           <div class="card-header">
-            <h3>👥 Membros Escalados</h3>
-            <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-membro-escala')">+ Adicionar</button>
+            <h3>🪑 Cadeiras</h3>
+            <button class="btn btn-ghost btn-sm" onclick="abrirAddCadeira()">+ Cadeira</button>
           </div>
-          <div class="card-body" id="esc-membros"></div>
+          <div class="card-body" id="esc-membros" style="padding:0 16px;"></div>
         </div>
 
         <!-- Info -->
@@ -1466,6 +1466,34 @@ body {
   </div>
 </div>
 
+<!-- Modal: Cadeira Picker -->
+<div class="modal-overlay" id="modal-cadeira-picker">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🪑 Escalar para <span id="modal-cadeira-funcao" style="color:var(--accent);"></span></h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-cadeira-picker')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-cadeira-list"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-cadeira-picker')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Adicionar Cadeira -->
+<div class="modal-overlay" id="modal-add-cadeira">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>➕ Adicionar Cadeira</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-add-cadeira')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-add-cadeira-list"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-cadeira')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Install PWA Banner -->
 <div id="install-banner" style="display:none;">
   <div>
@@ -1784,28 +1812,87 @@ function renderEscalaDetail(id) {
   document.getElementById('esc-detail-info').innerHTML = `${formatDate(e.data)} • ${e.hora}`;
   document.getElementById('esc-detail-status').innerHTML = statusTag(e.status);
 
-  // Membros
-  const membros = DB.get('membros',[]);
-  document.getElementById('esc-membros').innerHTML = e.membros.map(me => {
-    const m = membros.find(x=>x.id===me.id);
-    if (!m) return '';
-    const funcoes = memberFuncoes(m);
-    return `<div class="member-row">
-      <div class="avatar ${m.av}">${m.iniciais}</div>
-      <div class="m-info">
-        <div class="name">${m.nome}</div>
-        <div class="role" style="display:flex;flex-wrap:wrap;gap:3px;">${funcoes.map(f=>`<span style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:4px;">${f}</span>`).join('')}</div>
-      </div>
-      <select onchange="changeConfirm(${id},${m.id},this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:3px 6px;font-size:11px;cursor:pointer;">
-        <option value="pendente" ${me.confirm==='pendente'?'selected':''}>⏳ Pendente</option>
-        <option value="confirmado" ${me.confirm==='confirmado'?'selected':''}>✓ Confirmado</option>
-        <option value="recusado" ${me.confirm==='recusado'?'selected':''}>✗ Recusou</option>
-      </select>
-      <div class="icon-btn" onclick="removeMemberFromEscala(${id},${m.id})" title="Remover">✕</div>
-    </div>`;
-  }).join('') || '<div class="empty-state" style="padding:20px;"><p>Nenhum membro adicionado</p></div>';
+  renderCadeiras();
+  renderConfirmSummary();
 
-  // Confirm summary
+  // Slots count
+  const mainSlots = (e.slots||[]).filter(s=>s.tipo!=='ofertorio'&&s.tipo!=='santa-ceia');
+  document.getElementById('esc-slots-count').textContent = `${mainSlots.filter(s=>s.nome).length}/${mainSlots.length} músicas`;
+
+  renderSlots();
+  renderSugestoes();
+}
+
+/* ================================================================
+   CADEIRAS (Instrument Chairs)
+================================================================ */
+let currentCadeiraIdx = null;
+
+function ensureCadeiras(e) {
+  if (e.cadeiras && e.cadeiras.length) return;
+  const funcoes = DB.get('ministerio_funcoes', FUNCOES_LISTA);
+  e.cadeiras = funcoes.map(f => ({ funcao: f, membroId: null }));
+  const membros = DB.get('membros',[]);
+  e.membros.forEach(me => {
+    const m = membros.find(x=>x.id===me.id);
+    if (!m) return;
+    (m.funcoes||[]).forEach(f => {
+      const c = e.cadeiras.find(cc=>cc.funcao===f && !cc.membroId);
+      if (c) c.membroId = me.id;
+    });
+  });
+}
+
+function renderCadeiras() {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  if (!e) return;
+  ensureCadeiras(e);
+  DB.set('escalas', escalas);
+
+  const membros = DB.get('membros',[]);
+  const preenchidas = e.cadeiras.filter(c=>c.membroId).length;
+  const total = e.cadeiras.length;
+
+  document.getElementById('esc-membros').innerHTML =
+    `<div style="font-size:11px;color:var(--muted);padding:8px 0 4px;font-weight:600;">${preenchidas}/${total} cadeiras preenchidas</div>` +
+    e.cadeiras.map((c, idx) => {
+      const m = c.membroId ? membros.find(x=>x.id===c.membroId) : null;
+      const indisp = m ? isIndisponivel(m, e.data) : false;
+      const me = m ? e.membros.find(x=>x.id===m.id) : null;
+      if (m) {
+        return `<div class="member-row" style="padding:9px 0;border-bottom:1px solid var(--border);${indisp?'background:rgba(248,113,113,0.05);':''}">
+          <div class="avatar ${m.av}" style="width:34px;height:34px;font-size:11px;flex-shrink:0;${indisp?'border:2px solid var(--red);':''}">${m.iniciais}</div>
+          <div class="m-info" style="flex:1;min-width:0;">
+            <div style="font-size:10px;color:var(--muted);font-weight:600;line-height:1.2;">${c.funcao}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.nome}${indisp?'<span style="font-size:10px;color:var(--red);margin-left:5px;">🚫 Indisp.</span>':''}</div>
+          </div>
+          <select onchange="changeConfirmCadeira(${idx},this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:3px 5px;font-size:11px;cursor:pointer;flex-shrink:0;">
+            <option value="pendente"   ${me?.confirm==='pendente'  ?'selected':''}>⏳</option>
+            <option value="confirmado" ${me?.confirm==='confirmado'?'selected':''}>✓</option>
+            <option value="recusado"   ${me?.confirm==='recusado'  ?'selected':''}>✗</option>
+          </select>
+          <div class="icon-btn" onclick="removerDaCadeira(${idx})" title="Liberar cadeira" style="flex-shrink:0;">✕</div>
+        </div>`;
+      } else {
+        return `<div onclick="abrirCadeiraPicker(${idx})" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer;border-radius:4px;transition:background 0.15s;"
+          onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+          <div style="width:34px;height:34px;border-radius:50%;border:2px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;color:var(--muted);">🪑</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:10px;color:var(--muted);font-weight:600;line-height:1.2;">${c.funcao}</div>
+            <div style="font-size:12px;color:var(--muted);font-style:italic;">— vazio —</div>
+          </div>
+          <span style="font-size:11px;color:var(--accent);font-weight:600;">Escalar →</span>
+        </div>`;
+      }
+    }).join('') +
+    `<button onclick="abrirAddCadeira()" style="width:100%;margin-top:10px;margin-bottom:4px;padding:8px;background:transparent;border:1px dashed var(--border2);border-radius:var(--r-sm);color:var(--muted);font-size:12px;cursor:pointer;">+ Adicionar cadeira extra</button>`;
+}
+
+function renderConfirmSummary() {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  if (!e) return;
   const conf = e.membros.filter(m=>m.confirm==='confirmado').length;
   const pend = e.membros.filter(m=>m.confirm==='pendente').length;
   const rec  = e.membros.filter(m=>m.confirm==='recusado').length;
@@ -1824,30 +1911,106 @@ function renderEscalaDetail(id) {
         <div style="font-size:11px;color:var(--muted);">Recusaram</div>
       </div>
     </div>`;
+}
 
-  // Slots count
-  const mainSlots = (e.slots||[]).filter(s=>s.tipo!=='ofertorio'&&s.tipo!=='santa-ceia');
-  document.getElementById('esc-slots-count').textContent = `${mainSlots.filter(s=>s.nome).length}/${mainSlots.length} músicas`;
+function abrirCadeiraPicker(idx) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const c = e.cadeiras[idx];
+  currentCadeiraIdx = idx;
 
-  renderSlots();
-  renderSugestoes();
+  document.getElementById('modal-cadeira-funcao').textContent = c.funcao;
 
-  // Add membro modal list
-  const avail = membros.filter(m => !e.membros.find(em=>em.id===m.id));
-  document.getElementById('modal-add-membro-escala-list').innerHTML = avail.length
-    ? avail.map(m => {
-        const funcoes = memberFuncoes(m);
+  const membros = DB.get('membros',[]);
+  const candidatos = membros.filter(m => m.status !== 'inativo' && (m.funcoes||[]).includes(c.funcao));
+
+  document.getElementById('modal-cadeira-list').innerHTML = candidatos.length
+    ? candidatos.map(m => {
         const indisp = isIndisponivel(m, e.data);
-        return `<div class="member-row" style="cursor:pointer;${indisp?'opacity:0.5;':''}" onclick="${indisp?'':` addMembroEscala(${m.id})`}">
-          <div class="avatar ${m.av}">${m.iniciais}</div>
+        const jaEmOutraCadeira = e.cadeiras.some((cc,i) => i !== idx && cc.membroId === m.id);
+        return `<div class="member-row" style="cursor:pointer;${indisp?'background:rgba(248,113,113,0.06);':''}" onclick="atribuirMembroCadeira(${m.id})">
+          <div class="avatar ${m.av}" style="${indisp?'border:2px solid var(--red);':''}">${m.iniciais}</div>
           <div class="m-info">
-            <div class="name">${m.nome}</div>
-            <div class="role" style="display:flex;flex-wrap:wrap;gap:3px;">${funcoes.map(f=>`<span style="font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:4px;">${f}</span>`).join('')}</div>
+            <div class="name">${m.nome}${jaEmOutraCadeira?'<span style="font-size:10px;color:var(--gold);margin-left:6px;">⚠ já escalado</span>':''}</div>
+            <div class="role">${indisp?'🚫 Indisponível nesta data':'✅ Disponível'}</div>
           </div>
-          ${indisp?'<span class="tag tag-red">🚫 Indisp.</span>':'<button class="btn btn-ghost btn-xs">+ Adicionar</button>'}
+          ${indisp ? '<span class="tag tag-red" style="flex-shrink:0;">🚫 Indisp.</span>' : '<button class="btn btn-ghost btn-xs" style="flex-shrink:0;">Escalar</button>'}
         </div>`;
       }).join('')
-    : '<div class="empty-state"><p>Todos os membros já estão na escala</p></div>';
+    : `<div class="empty-state"><p>Nenhum membro cadastrado toca ${c.funcao}</p></div>`;
+
+  openModal('modal-cadeira-picker');
+}
+
+function atribuirMembroCadeira(memId) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const c = e.cadeiras[currentCadeiraIdx];
+  const prevId = c.membroId;
+
+  c.membroId = memId;
+
+  if (!e.membros.find(m=>m.id===memId)) {
+    e.membros.push({ id: memId, confirm: 'pendente' });
+  }
+
+  if (prevId && prevId !== memId) {
+    const stillInOther = e.cadeiras.some(cc => cc.membroId === prevId);
+    if (!stillInOther) e.membros = e.membros.filter(m=>m.id!==prevId);
+  }
+
+  DB.set('escalas', escalas);
+  closeModal('modal-cadeira-picker');
+  renderCadeiras();
+  renderConfirmSummary();
+  toast('✅ Membro escalado!');
+}
+
+function removerDaCadeira(idx) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const memId = e.cadeiras[idx].membroId;
+  e.cadeiras[idx].membroId = null;
+  const stillInOther = e.cadeiras.some(cc => cc.membroId === memId);
+  if (!stillInOther) e.membros = e.membros.filter(m=>m.id!==memId);
+  DB.set('escalas', escalas);
+  renderCadeiras();
+  renderConfirmSummary();
+  toast('Cadeira liberada');
+}
+
+function changeConfirmCadeira(idx, val) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const memId = e.cadeiras[idx].membroId;
+  const me = e.membros.find(m=>m.id===memId);
+  if (me) me.confirm = val;
+  DB.set('escalas', escalas);
+  renderConfirmSummary();
+}
+
+function abrirAddCadeira() {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  const ativas = DB.get('ministerio_funcoes', FUNCOES_LISTA);
+  const todas = TODAS_FUNCOES.length ? TODAS_FUNCOES : ativas;
+  document.getElementById('modal-add-cadeira-list').innerHTML =
+    `<p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Escolha a função para adicionar uma cadeira extra:</p>` +
+    `<div style="display:flex;flex-wrap:wrap;gap:8px;">` +
+    todas.map(f =>
+      `<button onclick="confirmarAddCadeira('${f.replace(/'/g,"\\'")}') " style="padding:7px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:99px;color:var(--text);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">${f}</button>`
+    ).join('') + `</div>`;
+  openModal('modal-add-cadeira');
+}
+
+function confirmarAddCadeira(funcao) {
+  const escalas = DB.get('escalas',[]);
+  const e = escalas.find(x=>x.id===currentEscalaId);
+  e.cadeiras.push({ funcao, membroId: null });
+  DB.set('escalas', escalas);
+  closeModal('modal-add-cadeira');
+  renderCadeiras();
+  toast(`Cadeira ${funcao} adicionada`);
 }
 
 /* ================================================================
@@ -2489,12 +2652,14 @@ function createEscala() {
   const escalas = DB.get('escalas',[]);
   const newId = Math.max(0,...escalas.map(e=>e.id))+1;
   const emptySlot = pos => ({ pos, nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:null });
+  const funcoes = DB.get('ministerio_funcoes', FUNCOES_LISTA);
   escalas.push({
     id: newId, titulo, data, hora,
     status: document.getElementById('ne-status').value,
     obs: document.getElementById('ne-obs').value.trim(),
     playlist: document.getElementById('ne-playlist').value.trim(),
     membros: [],
+    cadeiras: funcoes.map(f => ({ funcao: f, membroId: null })),
     oferta: { nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', escolhidoPor:null },
     slots: [emptySlot(1), emptySlot(2), emptySlot(3), emptySlot(4), emptySlot(5)],
     sugestoes: []
