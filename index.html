@@ -2637,6 +2637,8 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const USE_SUPABASE = !!(SUPA_URL && SUPA_KEY);
 
 let supabase = null;
+let _pendingMinisterioId   = null;
+let _pendingMinisterioNome = null;
 
 async function initSupabase() {
   if (!USE_SUPABASE) return false;
@@ -2715,16 +2717,55 @@ async function entrarComCodigo() {
   const codigo = document.getElementById('login-codigo').value.trim().toUpperCase();
   if (!codigo) { toast('⚠️ Digite o código'); return; }
   if (!supabase) { hideLogin(); seedData(); navigate('dashboard'); return; }
-  // Em produção: busca o ministério pelo código e vincula o membro
+
   toast('🔗 Buscando ministério...');
   try {
-    const { data, error } = await supabase
-      .from('ministerios')
-      .select('nome')
-      .eq('codigo', codigo)
-      .single();
-    if (error) throw new Error('Código inválido');
-    toast(`✅ Ministério "${data.nome}" encontrado! Faça login para continuar.`);
+    const { data, error } = await supabase.rpc('buscar_ministerio_por_codigo', { p_codigo: codigo });
+    if (error || !data || data.length === 0) throw new Error('Código inválido');
+
+    _pendingMinisterioId   = data[0].id;
+    _pendingMinisterioNome = data[0].nome;
+
+    // Muda o formulário para cadastro vinculado ao ministério
+    document.getElementById('login-extra').style.display = '';
+    document.getElementById('login-main-btn').textContent = `Entrar no ${_pendingMinisterioNome}`;
+    document.getElementById('login-main-btn').onclick = registrarComCodigo;
+    document.getElementById('login-toggle-btn').style.display = 'none';
+    document.getElementById('login-email').placeholder = 'Seu email';
+    document.getElementById('login-senha').placeholder = 'Crie uma senha (mín. 6 caracteres)';
+    toast(`✅ "${_pendingMinisterioNome}" encontrado! Preencha nome, email e senha.`);
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+async function registrarComCodigo() {
+  const nome  = document.getElementById('login-nome')?.value?.trim() || '';
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  if (!nome || !email || !senha) { toast('⚠️ Preencha nome, email e senha'); return; }
+  if (senha.length < 6)          { toast('⚠️ Senha precisa ter ao menos 6 caracteres'); return; }
+  if (!supabase)                  { hideLogin(); seedData(); navigate('dashboard'); return; }
+
+  try {
+    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password: senha });
+    if (authError) throw authError;
+
+    if (authData.user && _pendingMinisterioId) {
+      await supabase.from('membros').insert({
+        user_id:       authData.user.id,
+        ministerio_id: _pendingMinisterioId,
+        nome,
+        email,
+        funcao:    '🎤 Vocal',
+        permissao: 'participante',
+        avatar_cor: 'av1'
+      });
+    }
+
+    if (authData.session) {
+      await afterLogin(authData.session);
+    } else {
+      toast('📧 Verifique seu email e confirme o cadastro para entrar!');
+    }
   } catch(e) { toast('❌ ' + e.message); }
 }
 
