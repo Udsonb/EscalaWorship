@@ -824,7 +824,7 @@ body {
 <aside class="sidebar" id="sidebar">
   <div class="logo">
     <div class="logo-icon">
-      <img src="logo.png" alt="EscalaWorship" style="width:130px;height:auto;object-fit:contain;mix-blend-mode:screen;">
+      <img src="logo.png" alt="EscalaWorship" style="width:100%;height:auto;object-fit:contain;mix-blend-mode:screen;display:block;">
     </div>
   </div>
 
@@ -2418,10 +2418,53 @@ function calDayClick(d) {
 /* ================================================================
    MINISTÉRIO
 ================================================================ */
+const TODAS_FUNCOES = [
+  '🎹 Teclado','🎸 Baixo','🎸 Guitarra','🪗 Violão','🥁 Bateria','🪘 Percussão',
+  '🎤 Vocal 1','🎤 Vocal 2','🎤 Vocal 3','🎤 Vocal 4 / Apoio',
+  '🎺 Trompete','🎷 Saxofone','🎻 Violino','🪗 Acordeon',
+  '🔊 Som / Técnico','📹 Transmissão','💡 Iluminação','🎙️ Ministro','🎹 Órgão'
+];
+
 function renderMinisterio() {
-  document.getElementById('funcoes-list').innerHTML = FUNCOES_LISTA.map(f =>
-    `<span class="tag tag-purple" style="padding:5px 12px;font-size:12px;">${f}</span>`
-  ).join('');
+  const ativas = DB.get('ministerio_funcoes', FUNCOES_LISTA);
+  document.getElementById('funcoes-list').innerHTML = ativas.map(f =>
+    `<span class="tag tag-purple" style="padding:5px 10px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">
+      ${f}
+      <button onclick="removeFuncao('${f.replace(/'/g,"\\'")}') "
+        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0;"
+        title="Remover">×</button>
+    </span>`
+  ).join('') +
+  `<button onclick="abrirAddFuncao()" style="padding:5px 12px;background:var(--surface3);border:1px dashed var(--border2);border-radius:99px;color:var(--muted);font-size:12px;cursor:pointer;">+ Adicionar</button>`;
+}
+
+function removeFuncao(f) {
+  const ativas = DB.get('ministerio_funcoes', FUNCOES_LISTA);
+  DB.set('ministerio_funcoes', ativas.filter(x => x !== f));
+  renderMinisterio();
+}
+
+function abrirAddFuncao() {
+  const ativas = DB.get('ministerio_funcoes', FUNCOES_LISTA);
+  const disponiveis = TODAS_FUNCOES.filter(f => !ativas.includes(f));
+  const html = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;" id="add-funcao-overlay" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;max-width:380px;width:90%;">
+        <h3 style="font-family:'Syne',sans-serif;font-size:16px;margin-bottom:16px;">Adicionar função</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+          ${disponiveis.map(f => `<button onclick="addFuncao('${f.replace(/'/g,"\\'")}') " style="padding:6px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:99px;color:var(--text);font-size:12px;cursor:pointer;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">${f}</button>`).join('')}
+        </div>
+        <button onclick="document.getElementById('add-funcao-overlay').remove()" style="width:100%;padding:8px;background:transparent;border:1px solid var(--border2);border-radius:10px;color:var(--muted);cursor:pointer;">Fechar</button>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function addFuncao(f) {
+  const ativas = DB.get('ministerio_funcoes', FUNCOES_LISTA);
+  if (!ativas.includes(f)) { ativas.push(f); DB.set('ministerio_funcoes', ativas); }
+  document.getElementById('add-funcao-overlay')?.remove();
+  renderMinisterio();
 }
 
 function openNovoMembro() {
@@ -3001,6 +3044,38 @@ window.saveSlot = async function() {
   } catch(e) { console.warn('Slot sync falhou:', e); }
 };
 
+function showPasswordResetForm() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('login-screen').innerHTML = `
+    <div style="width:100%;max-width:400px;padding:20px;">
+      <div style="text-align:center;margin-bottom:28px;">
+        <img src="logo.png" style="width:180px;mix-blend-mode:screen;margin:0 auto 10px;display:block;">
+        <div style="font-size:13px;color:var(--muted);">Redefinir senha</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border2);border-radius:18px;padding:24px;">
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px;">Crie sua nova senha para acessar o EscalaWorship.</p>
+        <input class="form-input" id="reset-senha" type="password" placeholder="Nova senha (mín. 6 caracteres)" style="margin-bottom:10px;">
+        <input class="form-input" id="reset-senha2" type="password" placeholder="Confirme a nova senha" style="margin-bottom:14px;">
+        <button onclick="salvarNovaSenha()" style="width:100%;padding:11px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#b8943e);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;">Salvar senha e entrar</button>
+      </div>
+    </div>`;
+}
+
+async function salvarNovaSenha() {
+  const s1 = document.getElementById('reset-senha').value;
+  const s2 = document.getElementById('reset-senha2').value;
+  if (s1.length < 6)  { toast('⚠️ Senha precisa ter ao menos 6 caracteres'); return; }
+  if (s1 !== s2)      { toast('⚠️ As senhas não coincidem'); return; }
+  try {
+    const { error } = await supabase.auth.updateUser({ password: s1 });
+    if (error) throw error;
+    toast('✅ Senha salva! Entrando...');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) await afterLogin(session);
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
 /* ================================================================
    INIT
 ================================================================ */
@@ -3016,7 +3091,10 @@ async function init() {
       showLogin();
     }
     // Escuta mudanças de auth (callback após OAuth redirect)
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        showPasswordResetForm(); return;
+      }
       if (session && document.getElementById('login-screen').style.display !== 'none') {
         await afterLogin(session);
       }
