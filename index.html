@@ -1913,6 +1913,21 @@ function renderConfirmSummary() {
     </div>`;
 }
 
+function normFuncao(s) {
+  return (s||'').replace(/[^a-zA-ZÀ-ú0-9\s]/g,'').trim().toLowerCase();
+}
+
+function matchesCadeira(mFuncoes, cadFuncao) {
+  if (mFuncoes.includes(cadFuncao)) return true;
+  const cadN = normFuncao(cadFuncao);
+  return mFuncoes.some(f => {
+    const fN = normFuncao(f);
+    if (cadN.includes('vocal') && fN.includes('vocal')) return true;
+    const cadKey = cadN.replace(/\d+/g,'').trim().split(/\s+/)[0];
+    return cadKey.length > 2 && fN.includes(cadKey);
+  });
+}
+
 function abrirCadeiraPicker(idx) {
   const escalas = DB.get('escalas',[]);
   const e = escalas.find(x=>x.id===currentEscalaId);
@@ -1922,7 +1937,7 @@ function abrirCadeiraPicker(idx) {
   document.getElementById('modal-cadeira-funcao').textContent = c.funcao;
 
   const membros = DB.get('membros',[]);
-  const candidatos = membros.filter(m => m.status !== 'inativo' && (m.funcoes||[]).includes(c.funcao));
+  const candidatos = membros.filter(m => m.status !== 'inativo' && matchesCadeira(memberFuncoes(m), c.funcao));
 
   document.getElementById('modal-cadeira-list').innerHTML = candidatos.length
     ? candidatos.map(m => {
