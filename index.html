@@ -2678,9 +2678,32 @@ async function loginEmail() {
   const senha = document.getElementById('login-senha').value;
   if (!email || !senha) { toast('⚠️ Preencha email e senha'); return; }
   if (!supabase) { hideLogin(); seedData(); navigate('dashboard'); return; }
+  const btn = document.getElementById('login-main-btn');
+  btn.textContent = 'Entrando...'; btn.disabled = true;
   try {
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
     if (error) throw error;
+  } catch(e) {
+    btn.textContent = 'Entrar'; btn.disabled = false;
+    // Mostra erro em destaque embaixo do botão
+    let msg = e.message;
+    if (msg.includes('Invalid login credentials')) msg = 'Email ou senha incorretos';
+    if (msg.includes('Email not confirmed'))       msg = 'Email não confirmado — verifique sua caixa de entrada';
+    document.getElementById('login-error-msg').textContent = '⚠️ ' + msg;
+    document.getElementById('login-error-msg').style.display = 'block';
+  }
+}
+
+async function esqueceuSenha() {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) { toast('⚠️ Digite seu email primeiro'); return; }
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin
+    });
+    if (error) throw error;
+    toast('📧 Link de redefinição enviado para ' + email);
   } catch(e) { toast('❌ ' + e.message); }
 }
 
@@ -3047,9 +3070,14 @@ init();
         <input class="form-input" id="login-senha" type="password" placeholder="Senha">
       </div>
 
-      <button id="login-main-btn" onclick="loginEmail()" style="width:100%;padding:11px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#b8943e);color:#fff;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;">Entrar</button>
+      <button id="login-main-btn" onclick="loginEmail()" style="width:100%;padding:11px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#b8943e);color:#fff;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">Entrar</button>
 
-      <button id="login-toggle-btn" onclick="toggleLoginForm()" style="width:100%;padding:8px;background:transparent;border:none;color:var(--muted);font-size:12.5px;cursor:pointer;">Criar conta</button>
+      <div id="login-error-msg" style="display:none;background:rgba(248,113,113,0.12);border:1px solid var(--red);border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--red);margin-bottom:8px;"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <button id="login-toggle-btn" onclick="toggleLoginForm()" style="padding:8px 0;background:transparent;border:none;color:var(--muted);font-size:12.5px;cursor:pointer;">Criar conta</button>
+        <button onclick="esqueceuSenha()" style="padding:8px 0;background:transparent;border:none;color:var(--muted);font-size:12.5px;cursor:pointer;">Esqueci minha senha</button>
+      </div>
 
       <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center;">Entrar com código de convite</div>
