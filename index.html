@@ -3038,10 +3038,10 @@ init();
   <div style="width:100%;max-width:400px;">
     <!-- Logo -->
     <div style="text-align:center;margin-bottom:32px;">
-      <div style="width:200px;height:200px;margin:0 auto 14px;">
-        <img src="logo.png" alt="EscalaWorship" style="width:100%;height:100%;object-fit:contain;mix-blend-mode:screen;">
+      <div style="width:100%;margin:0 auto 8px;">
+        <img src="logo.png" alt="EscalaWorship" style="width:100%;height:auto;object-fit:contain;mix-blend-mode:screen;display:block;">
       </div>
-      <div style="font-size:13px;color:var(--muted);">Gestão de ministério de louvor</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Gestão de ministério de louvor</div>
     </div>
 
     <!-- Card login -->
@@ -3064,10 +3064,10 @@ init();
       </div>
 
       <div style="margin-bottom:10px;">
-        <input class="form-input" id="login-email" type="email" placeholder="Email">
+        <input class="form-input" id="login-email" type="email" placeholder="Email" autocomplete="email" data-form-type="other">
       </div>
       <div style="margin-bottom:14px;">
-        <input class="form-input" id="login-senha" type="password" placeholder="Senha">
+        <input class="form-input" id="login-senha" type="password" placeholder="Senha" autocomplete="current-password" data-form-type="other">
       </div>
 
       <button id="login-main-btn" onclick="loginEmail()" style="width:100%;padding:11px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#b8943e);color:#fff;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">Entrar</button>
