@@ -944,10 +944,10 @@ body {
       <div style="background:linear-gradient(135deg,rgba(96,165,250,0.12),rgba(201,167,106,0.08));border:1px solid rgba(96,165,250,0.2);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
         <div style="font-size:26px;">📅</div>
         <div style="flex:1;">
-          <div style="font-weight:700;font-size:14px;">Sincronize com o Google Agenda</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Suas escalas aparecem automaticamente no calendário</div>
+          <div style="font-weight:700;font-size:14px;">Google Agenda</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Exporte todas as escalas ou adicione cada uma individualmente</div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="syncGoogle()">Conectar Google</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportarIcal()">⬇️ Exportar .ics</button>
       </div>
     </div>
 
@@ -968,6 +968,7 @@ body {
         <button class="btn btn-ghost btn-sm" onclick="navigate('escalas')">← Voltar</button>
         <h2 id="esc-detail-name" style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;flex:1;"></h2>
         <span id="esc-detail-info" class="tag tag-muted"></span>
+        <button class="btn btn-ghost btn-sm" id="esc-gcal-btn" onclick="adicionarEscalaGoogleAgenda()" title="Adicionar ao Google Agenda">📅</button>
         <button class="btn btn-gold btn-sm" onclick="publishEscala()">📢 Publicar</button>
       </div>
 
@@ -1141,8 +1142,8 @@ body {
           <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.18);border-radius:var(--r);padding:14px;text-align:center;">
             <div style="font-size:22px;margin-bottom:6px;">📅</div>
             <div style="font-weight:600;font-size:13px;margin-bottom:3px;">Google Agenda</div>
-            <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Sincronize suas escalas com o calendário</div>
-            <button class="btn btn-ghost btn-sm" onclick="syncGoogle()" style="width:100%;">Conectar conta Google</button>
+            <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Exporte todas as escalas ou adicione individualmente em cada escala</div>
+            <button class="btn btn-ghost btn-sm" onclick="exportarIcal()" style="width:100%;margin-bottom:6px;">⬇️ Exportar todas (.ics)</button>
           </div>
           <!-- Spotify connect -->
           <div style="background:rgba(29,185,84,0.07);border:1px solid rgba(29,185,84,0.2);border-radius:var(--r);padding:14px;text-align:center;margin-top:12px;">
@@ -3581,8 +3582,63 @@ function escalaDateBadge(data, size) {
   return `<div class="escala-date"><div class="eday">${day}</div><div class="emon">${mon}</div></div>`;
 }
 
-function syncGoogle() {
-  toast('📅 Abrindo autenticação Google... (requer backend para integração completa)');
+function syncGoogle() { exportarIcal(); }
+
+function exportarIcal() {
+  const escalas = DB.get('escalas', []).filter(e => e.status !== 'rascunho');
+  if (!escalas.length) { toast('⚠️ Nenhuma escala publicada para exportar'); return; }
+  const ical = _gerarIcal(escalas);
+  const blob = new Blob([ical], { type: 'text/calendar;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: 'escalas-ministerio.ics' });
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast('📅 Arquivo .ics baixado! Abra no Google Agenda → "Outros agendas" → "Importar"');
+}
+
+function adicionarEscalaGoogleAgenda() {
+  const escalas = DB.get('escalas', []);
+  const e = escalas.find(x => x.id === currentEscalaId);
+  if (!e) return;
+  const [ano, mes, dia] = e.data.split('-');
+  const [h, m] = (e.hora || '09:00').split(':');
+  const pad = n => String(n).padStart(2, '0');
+  const dataStr  = `${ano}${mes}${dia}T${pad(h)}${pad(m)}00`;
+  // Fim = início + 2h
+  const fimDate  = new Date(e.data + 'T' + (e.hora || '09:00'));
+  fimDate.setHours(fimDate.getHours() + 2);
+  const fimStr   = `${fimDate.getFullYear()}${pad(fimDate.getMonth()+1)}${pad(fimDate.getDate())}T${pad(fimDate.getHours())}${pad(fimDate.getMinutes())}00`;
+  const titulo   = encodeURIComponent(`${e.titulo} — ${MIN_NOME || 'Ministério'}`);
+  const descricao = encodeURIComponent(`Membros: ${(e.membros || []).length} | Status: ${e.status}${e.obs ? '\n' + e.obs : ''}`);
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titulo}&dates=${dataStr}/${fimStr}&details=${descricao}`;
+  window.open(url, '_blank');
+}
+
+function _gerarIcal(escalas) {
+  const linhas = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//EscalaWorship//PT','CALSCALE:GREGORIAN','METHOD:PUBLISH'];
+  escalas.forEach(e => {
+    if (!e.data) return;
+    const [ano, mes, dia] = e.data.split('-');
+    const [h, m] = (e.hora || '09:00').split(':');
+    const pad = n => String(n).padStart(2,'0');
+    const dtStart = `${ano}${mes}${dia}T${pad(h)}${pad(m)}00`;
+    const fimDate = new Date(e.data + 'T' + (e.hora || '09:00'));
+    fimDate.setHours(fimDate.getHours() + 2);
+    const dtEnd = `${fimDate.getFullYear()}${pad(fimDate.getMonth()+1)}${pad(fimDate.getDate())}T${pad(fimDate.getHours())}${pad(fimDate.getMinutes())}00`;
+    const nMembros = (e.membros || []).length;
+    linhas.push(
+      'BEGIN:VEVENT',
+      `UID:escala-${e.id}@escalaworship`,
+      `DTSTART:${dtStart}`,
+      `DTEND:${dtEnd}`,
+      `SUMMARY:${(e.titulo + ' — ' + (MIN_NOME || 'Ministério')).replace(/[,;]/g,' ')}`,
+      `DESCRIPTION:Membros: ${nMembros} | Status: ${e.status}${e.obs ? '\\n' + e.obs.replace(/\n/g,'\\n') : ''}`,
+      `STATUS:${e.status === 'publicada' ? 'CONFIRMED' : 'TENTATIVE'}`,
+      'END:VEVENT'
+    );
+  });
+  linhas.push('END:VCALENDAR');
+  return linhas.join('\r\n');
 }
 
 function abrirConvite() {
