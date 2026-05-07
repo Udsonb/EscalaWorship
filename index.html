@@ -877,7 +877,7 @@ body {
     <div class="hamburger" onclick="toggleSidebar()">☰</div>
     <h1 id="page-title">Início</h1>
     <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
-      <button class="btn btn-ghost btn-sm" onclick="openModal('modal-invite')">🔗 Convidar</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirConvite()">🔗 Convidar</button>
       <button class="btn btn-primary btn-sm" id="main-action" onclick="handleMainAction()">+ Nova Escala</button>
     </div>
   </div>
@@ -1073,6 +1073,7 @@ body {
           <option>Louvor</option>
           <option>Especiais</option>
         </select>
+        <button class="btn btn-ghost btn-sm" onclick="importarPlaylistSpotify()" style="white-space:nowrap;">🎧 Importar Playlist</button>
       </div>
       <div class="card">
         <div class="card-header"><h3 id="musicas-count">Repertório</h3></div>
@@ -1523,14 +1524,14 @@ body {
       <div class="form-group">
         <label class="form-label">Link de convite</label>
         <div class="flex-row">
-          <input class="form-input" value="https://escalaworship.app/join/VIDANOVA2026" readonly>
-          <button class="btn btn-ghost btn-sm" onclick="copyText('https://escalaworship.app/join/VIDANOVA2026')">📋</button>
+          <input class="form-input" id="inv-url" value="" readonly>
+          <button class="btn btn-ghost btn-sm" id="inv-url-copy">📋</button>
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Código de acesso</label>
-        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;letter-spacing:6px;color:var(--accent2);background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center;cursor:pointer;" onclick="copyText('VIDA26')">
-          VIDA26
+        <div id="inv-codigo" style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;letter-spacing:6px;color:var(--accent2);background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center;cursor:pointer;">
+          ...
         </div>
         <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px;">Toque para copiar</div>
       </div>
@@ -1751,6 +1752,8 @@ let editingMembroId  = null;
 let calYear = 2026, calMonth = 4;
 
 const ME = { id:1, nome:'Ricardo Barbosa', iniciais:'RB', av:'av1' };
+let MIN_CODIGO = '';
+let MIN_NOME   = '';
 
 /* ================================================================
    NAVIGATION
@@ -2321,6 +2324,24 @@ function saveSlot() {
     if (!s.escolhidoPor) s.escolhidoPor = ME.id;
   }
   DB.set('escalas', escalas);
+  // Auto-adiciona ao repertório se a música ainda não estiver lá
+  if (data.nome) {
+    const musicas = DB.get('musicas', []);
+    const existe = musicas.some(m =>
+      (data.spotify && m.spotify === data.spotify) ||
+      m.titulo.toLowerCase() === data.nome.toLowerCase()
+    );
+    if (!existe) {
+      musicas.push({
+        id: Math.max(0, ...musicas.map(m => m.id)) + 1,
+        titulo: data.nome, artista: data.artista || '',
+        tom: data.tom || '', bpm: data.bpm || '',
+        spotify: data.spotify || '', youtube: data.youtube || '',
+        cifra: data.cifra || '', pasta: 'Louvor'
+      });
+      DB.set('musicas', musicas);
+    }
+  }
   closeModal('modal-slot');
   renderSlots();
   const label = editingSlotPos==='oferta'?'Oferta':editingSlotPos==='santa-ceia'?'Santa Ceia':`posição ${editingSlotPos}`;
@@ -2592,6 +2613,54 @@ function saveMusica() {
   closeModal('modal-musica');
   renderMusicas();
   toast('✅ Música adicionada ao repertório!');
+}
+
+async function importarPlaylistSpotify() {
+  if (!spotifyToken) {
+    toast('⚠️ Conecte o Spotify primeiro.');
+    conectarSpotifyParaBusca();
+    return;
+  }
+  const url = prompt('Cole o link da Playlist do Spotify:');
+  if (!url) return;
+  const match = url.match(/playlist[\/:]([A-Za-z0-9]+)/);
+  if (!match) { toast('❌ Link de playlist inválido'); return; }
+  const playlistId = match[1];
+  toast('⏳ Importando playlist...');
+  try {
+    const musicas = DB.get('musicas', []);
+    let offset = 0, added = 0;
+    while (true) {
+      const res = await fetch(
+        `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&offset=${offset}&market=BR`,
+        { headers: { Authorization: `Bearer ${spotifyToken}` } }
+      );
+      if (res.status === 401) {
+        spotifyToken = null; localStorage.removeItem('_sp_token'); localStorage.removeItem('_sp_exp');
+        toast('❌ Token expirado. Reconecte o Spotify.'); conectarSpotifyParaBusca(); return;
+      }
+      if (!res.ok) throw new Error('Erro ao buscar playlist');
+      const d = await res.json();
+      for (const item of (d.items || [])) {
+        const t = item.track;
+        if (!t || t.type !== 'track') continue;
+        const link = t.external_urls?.spotify || '';
+        if (!musicas.some(m => (link && m.spotify === link) || m.titulo.toLowerCase() === t.name.toLowerCase())) {
+          musicas.push({
+            id: Math.max(0, ...musicas.map(m => m.id)) + 1,
+            titulo: t.name, artista: t.artists?.map(a => a.name).join(', ') || '',
+            tom: '', bpm: '', spotify: link, youtube: '', cifra: '', pasta: 'Louvor'
+          });
+          added++;
+        }
+      }
+      offset += d.items.length;
+      if (offset >= d.total || offset >= 200 || !d.items.length) break;
+    }
+    DB.set('musicas', musicas);
+    renderMusicas();
+    toast(`✅ ${added} músicas importadas da playlist!`);
+  } catch(e) { toast('❌ ' + e.message); }
 }
 
 /* ================================================================
@@ -3122,9 +3191,22 @@ function syncGoogle() {
   toast('📅 Abrindo autenticação Google... (requer backend para integração completa)');
 }
 
+function abrirConvite() {
+  const codigo = MIN_CODIGO || 'SEMCOD';
+  const url = `${location.origin}?invite=${codigo}`;
+  document.getElementById('inv-url').value = url;
+  document.getElementById('inv-url-copy').onclick = () => copyText(url);
+  const el = document.getElementById('inv-codigo');
+  el.textContent = codigo;
+  el.onclick = () => copyText(codigo);
+  openModal('modal-invite');
+}
+
 function shareWhatsApp() {
-  const url = encodeURIComponent('https://escalaworship.app/join/VIDANOVA2026');
-  window.open(`https://wa.me/?text=Entre%20no%20nosso%20minist%C3%A9rio%20no%20EscalaWorship!%20${url}`, '_blank');
+  const codigo = MIN_CODIGO || 'SEMCOD';
+  const url = encodeURIComponent(`${location.origin}?invite=${codigo}`);
+  const nomeMin = encodeURIComponent(MIN_NOME || 'nosso ministério');
+  window.open(`https://wa.me/?text=Entre%20no%20${nomeMin}%20no%20EscalaWorship!%20${url}`, '_blank');
 }
 
 function copyText(txt) {
@@ -3190,6 +3272,57 @@ let supabase = null;
 let _pendingMinisterioId   = null;
 let _pendingMinisterioNome = null;
 let spotifyToken = null;
+
+const SPOTIFY_CLIENT_ID = 'df4cb7342516426e9b32165ef28bf42f';
+
+// ---- Spotify PKCE helpers ----
+function _spVerifier(len) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const arr = crypto.getRandomValues(new Uint8Array(len));
+  return Array.from(arr, b => chars[b % chars.length]).join('');
+}
+async function _spChallenge(v) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
+  return btoa(String.fromCharCode(...new Uint8Array(d))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+}
+
+async function conectarSpotifyParaBusca() {
+  const verifier = _spVerifier(128);
+  localStorage.setItem('_sp_v', verifier);
+  const params = new URLSearchParams({
+    client_id: SPOTIFY_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: location.origin,
+    scope: 'user-read-private playlist-read-private playlist-read-collaborative',
+    code_challenge_method: 'S256',
+    code_challenge: await _spChallenge(verifier),
+    state: 'sp_busca'
+  });
+  location.href = 'https://accounts.spotify.com/authorize?' + params;
+}
+
+async function _trocarSpotifyCode(code) {
+  const verifier = localStorage.getItem('_sp_v');
+  if (!verifier) return;
+  try {
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: SPOTIFY_CLIENT_ID, grant_type: 'authorization_code',
+        code, redirect_uri: location.origin, code_verifier: verifier
+      })
+    });
+    const d = await res.json();
+    if (d.access_token) {
+      spotifyToken = d.access_token;
+      localStorage.setItem('_sp_token', d.access_token);
+      localStorage.setItem('_sp_exp', Date.now() + (d.expires_in - 60) * 1000);
+      localStorage.removeItem('_sp_v');
+      toast('✅ Spotify conectado! Já pode buscar músicas.');
+    }
+  } catch(e) { console.warn('Spotify token exchange:', e); }
+}
 
 async function initSupabase() {
   if (!USE_SUPABASE) return false;
@@ -3401,11 +3534,12 @@ async function executarBuscaSpotify() {
   if (!spotifyToken) {
     document.getElementById('sps-resultados').innerHTML =
       `<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;">
-        ⚠️ Faça login com Spotify para usar esta função.
+        Para buscar músicas, conecte sua conta Spotify.<br>
+        <small>Você continuará logado com seu usuário atual.</small>
         <br><br>
-        <button onclick="closeModal('modal-spotify-search');loginSpotify();"
+        <button onclick="conectarSpotifyParaBusca()"
           style="padding:8px 16px;border-radius:8px;background:#1DB954;color:#fff;border:none;cursor:pointer;font-weight:600;">
-          Entrar com Spotify
+          🎵 Conectar Spotify
         </button>
       </div>`;
     return;
@@ -3416,7 +3550,18 @@ async function executarBuscaSpotify() {
       `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=6&market=BR`,
       { headers: { Authorization: `Bearer ${spotifyToken}` } }
     );
-    if (res.status === 401) { spotifyToken = null; throw new Error('Token expirado — faça login com Spotify novamente'); }
+    if (res.status === 401) {
+      spotifyToken = null; localStorage.removeItem('_sp_token'); localStorage.removeItem('_sp_exp');
+      document.getElementById('sps-resultados').innerHTML =
+        `<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;">
+          Token do Spotify expirou.<br><br>
+          <button onclick="conectarSpotifyParaBusca()"
+            style="padding:8px 16px;border-radius:8px;background:#1DB954;color:#fff;border:none;cursor:pointer;font-weight:600;">
+            🎵 Reconectar Spotify
+          </button>
+        </div>`;
+      return;
+    }
     if (!res.ok) throw new Error('Erro ao buscar no Spotify');
     const dados = await res.json();
     const tracks = dados.tracks?.items || [];
@@ -3577,6 +3722,10 @@ async function syncFromSupabase(membro) {
   if (!supabase) return;
   try {
     const minId = membro.ministerio_id;
+    if (membro.ministerios) {
+      MIN_CODIGO = membro.ministerios.codigo || '';
+      MIN_NOME   = membro.ministerios.nome   || '';
+    }
 
     // Membros
     const { data: membros } = await supabase.from('membros').select('*').eq('ministerio_id', minId);
@@ -3743,27 +3892,48 @@ async function salvarNovaSenha() {
    INIT
 ================================================================ */
 async function init() {
+  const urlParams = new URLSearchParams(location.search);
+
+  // 1. Callback Spotify PKCE (antes do Supabase processar a URL)
+  if (urlParams.get('state') === 'sp_busca' && urlParams.get('code')) {
+    history.replaceState({}, '', location.pathname);
+    await _trocarSpotifyCode(urlParams.get('code'));
+  }
+
+  // 2. Restaurar token Spotify cacheado
+  const spToken = localStorage.getItem('_sp_token');
+  const spExp   = localStorage.getItem('_sp_exp');
+  if (spToken && spExp && Date.now() < parseInt(spExp)) spotifyToken = spToken;
+
+  // 3. Código de convite na URL (?invite=CODIGO)
+  const inviteCode = urlParams.get('invite');
+  if (inviteCode) {
+    localStorage.setItem('_invite_code', inviteCode);
+    history.replaceState({}, '', location.pathname);
+  }
+
   const hasSupa = await initSupabase();
 
   if (hasSupa) {
-    // Supabase disponível — verifica sessão
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       await afterLogin(session);
     } else {
       showLogin();
-    }
-    // Escuta mudanças de auth (callback após OAuth redirect)
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        showPasswordResetForm(); return;
+      // Pré-preenche código de convite se veio pela URL
+      const ic = localStorage.getItem('_invite_code');
+      if (ic) {
+        const el = document.getElementById('login-codigo');
+        if (el) { el.value = ic; localStorage.removeItem('_invite_code'); }
       }
+    }
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') { showPasswordResetForm(); return; }
       if (session && document.getElementById('login-screen').style.display !== 'none') {
         await afterLogin(session);
       }
     });
   } else {
-    // Modo offline / demo — usa localStorage
     seedData();
     navigate('dashboard');
   }

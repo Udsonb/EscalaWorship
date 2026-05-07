@@ -422,19 +422,35 @@ create or replace function criar_ministerio_com_admin(
   p_email           text
 ) returns json language plpgsql security definer as $$
 declare
+  v_base   text;
   v_codigo text;
   v_min_id uuid;
   v_mem_id uuid;
+  v_ano    text := to_char(now(), 'YY');
+  i        int;
 begin
   -- Garante que o usuário ainda não está vinculado a nenhum ministério
   if exists(select 1 from membros where user_id = auth.uid()) then
     raise exception 'Usuário já possui um ministério vinculado';
   end if;
-  -- Código único (tenta até 5 vezes para evitar colisão)
-  for i in 1..5 loop
-    v_codigo := gerar_codigo_ministerio();
-    exit when not exists(select 1 from ministerios where codigo = v_codigo);
-  end loop;
+  -- Gera base do código a partir do nome: remove acentos, espaços e símbolos
+  v_base := regexp_replace(
+    upper(translate(
+      p_nome_ministerio,
+      'ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜàáâãäåçèéêëìíîïñòóôõöùúûü',
+      'AAAAAACEEEEIIIINOOOOOUUUUaaaaaaceeeeiiiinooooouuuu'
+    )),
+    '[^A-Z0-9]', '', 'g'
+  );
+  v_base := left(v_base, 12);
+  -- Código = base + ano (2 dígitos), com sufixo numérico se houver colisão
+  v_codigo := v_base || v_ano;
+  if exists(select 1 from ministerios where codigo = v_codigo) then
+    for i in 2..9 loop
+      v_codigo := v_base || v_ano || i::text;
+      exit when not exists(select 1 from ministerios where codigo = v_codigo);
+    end loop;
+  end if;
   -- Cria ministério
   insert into ministerios(nome, tipo, codigo)
     values(p_nome_ministerio, 'Louvor', v_codigo)
@@ -535,3 +551,18 @@ begin
     (min_id, m3, 'Confirmo presença no ensaio de sexta 🥁');
 
 end $$;
+
+-- ============================================================
+-- LIMPAR TODOS OS DADOS (execute no Supabase SQL Editor para
+-- apagar os dados de demonstração antes de usar em produção)
+-- ============================================================
+-- truncate table chat_mensagens  cascade;
+-- truncate table avisos          cascade;
+-- truncate table sugestoes       cascade;
+-- truncate table escala_slots    cascade;
+-- truncate table escala_membros  cascade;
+-- truncate table escalas         cascade;
+-- truncate table musicas         cascade;
+-- truncate table indisponibilidades cascade;
+-- truncate table membros         cascade;
+-- truncate table ministerios     cascade;
