@@ -3014,23 +3014,29 @@ function renderAvisos() {
   const periodLabel = { temporario:'🕐 Temporário', confirmacao:'✅ Por confirmação', semanal:'📅 Semanal', mensal:'📆 Mensal', permanente:'📌 Permanente' };
 
   document.getElementById('avisos-list').innerHTML = avisosGerais.map(a => {
-    const isAutor   = String(a.autorId) === String(ME.id);
-    const canDelete = isAutor || isLider;
-    // Botão "Li" só para temporario/confirmacao (semanal/mensal expiram sozinhos; permanente não some)
-    const naoLido   = a.periodicidade === 'temporario' || a.periodicidade === 'confirmacao';
+    const isAutor    = String(a.autorId) === String(ME.id);
+    const canDeleteAll = isAutor || isLider; // exclui para todos
+    const lidoEntry  = lidos.find(l => String(l.avisoId) === String(a.id));
+    const jaLido     = !!lidoEntry;
+    const naoEhPermanente = a.periodicidade !== 'permanente';
+    // "✓ Li": mostra para avisos não-permanentes ainda não lidos pelo membro
+    const showLerBtn = naoEhPermanente && !jaLido;
+    // "🗑️ Excluir" pessoal: habilitado só após ler; desabilitado antes
+    const showDescartarBtn = naoEhPermanente && !isAutor && !isLider;
     return `
     <div class="aviso-card ${a.tipo === 'urgente' ? 'urg' : a.tipo === 'info' ? 'info' : ''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <h4 style="margin:0;">${a.titulo}</h4>
-        ${canDelete ? `<button onclick="deletarAviso('${a.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px;padding:0;flex-shrink:0;" title="Excluir aviso">🗑️</button>` : ''}
+        ${canDeleteAll ? `<button onclick="deletarAviso('${a.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px;padding:0;flex-shrink:0;" title="Excluir para todos">🗑️</button>` : ''}
       </div>
       <p>${a.msg}</p>
       <div class="av-meta" style="display:flex;justify-content:space-between;align-items:center;">
         <span>Por ${a.por} • ${a.quando}</span>
         <span style="font-size:10px;opacity:0.7;">${periodLabel[a.periodicidade] || ''}</span>
       </div>
-      ${naoLido ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
-        <button class="btn btn-ghost btn-sm" style="color:var(--green);" onclick="confirmarLeituraAviso('${a.id}')">✓ ${a.periodicidade === 'confirmacao' ? 'Confirmar leitura' : 'Marcar como lido'}</button>
+      ${(showLerBtn || showDescartarBtn) ? `<div style="display:flex;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+        ${showLerBtn ? `<button class="btn btn-ghost btn-sm" style="color:var(--green);" onclick="confirmarLeituraAviso('${a.id}')">✓ ${a.periodicidade === 'confirmacao' ? 'Confirmar leitura' : 'Marcar como lido'}</button>` : `<span class="tag tag-green" style="font-size:11px;">✓ Lido</span>`}
+        ${showDescartarBtn ? `<button class="btn btn-ghost btn-sm" style="color:var(--muted);${!jaLido ? 'opacity:0.35;pointer-events:none;' : ''}" onclick="descartarAviso('${a.id}')" ${!jaLido ? 'disabled' : ''}>🗑️ Excluir</button>` : ''}
       </div>` : ''}
     </div>`
   }).join('') || '<div class="empty-state"><div class="ei">🔔</div><h3>Nenhum aviso</h3></div>';
@@ -3077,33 +3083,44 @@ function isAvisoVisivel(aviso, lidos) {
     const diffDias = (Date.now() - new Date(aviso.criadoEm)) / 86400000;
     if (diffDias >= 30) return false;
   }
-  // Permanente: sempre visível
+  // Permanente: sempre visível (só autor/líder pode excluir do banco)
   if (aviso.periodicidade === 'permanente') return true;
-  // Temporário/Confirmação: some quando o membro descarta
+  // Outros: some quando o membro descarta explicitamente
   const lido = lidos.find(l => String(l.avisoId) === String(aviso.id));
   return !lido || !lido.descartado;
 }
 
-// Marca aviso como lido/descartado (somente temporario e confirmacao)
+// Marca aviso como lido (habilita o botão excluir, mas não exclui)
 async function confirmarLeituraAviso(id) {
-  const avisos = DB.get('avisos', []);
-  const aviso  = avisos.find(a => String(a.id) === String(id));
-  if (!aviso) return;
-  const descartado = true; // só chama esse botão para temporario/confirmacao
   const lidos = DB.get('aviso_lidos', []);
   const idx   = lidos.findIndex(l => String(l.avisoId) === String(id));
   const agora = new Date().toISOString();
-  if (idx >= 0) { lidos[idx].lidoEm = agora; lidos[idx].descartado = descartado; }
-  else          { lidos.push({ avisoId: id, lidoEm: agora, descartado }); }
+  if (idx >= 0) { lidos[idx].lidoEm = agora; }
+  else          { lidos.push({ avisoId: id, lidoEm: agora, descartado: false }); }
   DB.set('aviso_lidos', lidos);
   if (supabase && ME.id) {
-    await supabase.from('aviso_lidos').upsert({ aviso_id: id, membro_id: ME.id, lido_em: agora, descartado }, { onConflict: 'aviso_id,membro_id' });
+    await supabase.from('aviso_lidos').upsert({ aviso_id: id, membro_id: ME.id, lido_em: agora, descartado: false }, { onConflict: 'aviso_id,membro_id' });
   }
   renderAvisos();
-  toast(descartado ? '✓ Aviso descartado' : '✓ Leitura confirmada');
+  toast('✓ Leitura confirmada');
 }
 
-// Deleta aviso permanentemente (autor ou líder) — remove para todos
+// Membro descarta aviso da própria visualização (só após ler, não permanente)
+async function descartarAviso(id) {
+  const lidos = DB.get('aviso_lidos', []);
+  const idx   = lidos.findIndex(l => String(l.avisoId) === String(id));
+  const agora = new Date().toISOString();
+  if (idx >= 0) { lidos[idx].descartado = true; }
+  else          { lidos.push({ avisoId: id, lidoEm: agora, descartado: true }); }
+  DB.set('aviso_lidos', lidos);
+  if (supabase && ME.id) {
+    await supabase.from('aviso_lidos').upsert({ aviso_id: id, membro_id: ME.id, lido_em: agora, descartado: true }, { onConflict: 'aviso_id,membro_id' });
+  }
+  renderAvisos();
+  toast('🗑️ Aviso removido da sua lista');
+}
+
+// Autor ou líder exclui aviso para todos — remove do banco
 async function deletarAviso(id) {
   if (supabase) {
     const { error } = await supabase.from('avisos').delete().eq('id', id);
@@ -3111,7 +3128,7 @@ async function deletarAviso(id) {
   }
   DB.set('avisos', DB.get('avisos', []).filter(a => String(a.id) !== String(id)));
   renderAvisos();
-  toast('🗑️ Aviso excluído');
+  toast('🗑️ Aviso excluído para todos');
 }
 
 /* ================================================================
