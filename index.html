@@ -1987,12 +1987,18 @@ function renderDashboard() {
     </div>
   `).join('') || '<div class="empty-state" style="padding:16px;"><p>Nenhum aviso</p></div>';
 
-  // Minhas escalas (para o membro logado)
+  // Minhas escalas (para o membro logado) — inclui passadas se ainda não confirmei
   const cardMinhas = document.getElementById('card-minhas-escalas');
   const dashMinhas = document.getElementById('dash-minhas-escalas');
   if (cardMinhas && ME.id) {
+    const seteAtras = new Date(); seteAtras.setDate(seteAtras.getDate() - 7);
+    const seteStr = seteAtras.toISOString().split('T')[0];
     const minhasEscalas = escalas
-      .filter(e => e.data >= hoje && (e.membros || []).some(m => String(m.id) === String(ME.id)))
+      .filter(e => {
+        const meObj = (e.membros || []).find(m => String(m.id) === String(ME.id));
+        if (!meObj) return false;
+        return e.data >= hoje || (e.data >= seteStr && meObj.confirm === 'pendente');
+      })
       .sort((a, b) => a.data.localeCompare(b.data));
     if (minhasEscalas.length) {
       cardMinhas.style.display = '';
@@ -2189,12 +2195,18 @@ function ensureCadeiras(e) {
   e.cadeiras = funcoes.map(f => ({ funcao: f, membroId: null }));
   const membros = DB.get('membros',[]);
   e.membros.forEach(me => {
-    const m = membros.find(x=>x.id===me.id);
+    const m = membros.find(x => String(x.id) === String(me.id));
     if (!m) return;
-    (m.funcoes||[]).forEach(f => {
-      const c = e.cadeiras.find(cc=>cc.funcao===f && !cc.membroId);
+    const fs = (m.funcoes && m.funcoes.length) ? m.funcoes : (m.funcao ? [m.funcao] : []);
+    fs.forEach(f => {
+      const c = e.cadeiras.find(cc => cc.funcao === f && !cc.membroId);
       if (c) c.membroId = me.id;
     });
+    // Fallback: assign to first empty cadeira if no function match found
+    if (!e.cadeiras.some(cc => String(cc.membroId) === String(me.id))) {
+      const c = e.cadeiras.find(cc => !cc.membroId);
+      if (c) c.membroId = me.id;
+    }
   });
 }
 
@@ -2941,10 +2953,15 @@ function renderAvisos() {
   const hoje = new Date().toISOString().split('T')[0];
   const escalas = DB.get('escalas', []);
 
-  // Minhas escalas pendentes de confirmação
+  // Minhas escalas — futuras + passadas ainda pendentes (últimos 7 dias)
+  const seteAtras2 = new Date(); seteAtras2.setDate(seteAtras2.getDate() - 7);
+  const seteStr2 = seteAtras2.toISOString().split('T')[0];
   const minhasEscalas = ME.id
-    ? escalas.filter(e => e.data >= hoje && (e.membros || []).some(m => String(m.id) === String(ME.id)))
-        .sort((a, b) => a.data.localeCompare(b.data))
+    ? escalas.filter(e => {
+        const meObj = (e.membros || []).find(m => String(m.id) === String(ME.id));
+        if (!meObj) return false;
+        return e.data >= hoje || (e.data >= seteStr2 && meObj.confirm === 'pendente');
+      }).sort((a, b) => a.data.localeCompare(b.data))
     : [];
 
   const containerMinhas = document.getElementById('avisos-minhas-escalas');
@@ -3115,15 +3132,22 @@ function renderCalendar() {
     ? mesEscalas.map(e => {
         const euEscalado = ME.id && (e.membros||[]).some(m => String(m.id)===String(ME.id));
         const meObj = euEscalado ? (e.membros||[]).find(m => String(m.id)===String(ME.id)) : null;
+        const isPendente = euEscalado && meObj && meObj.confirm === 'pendente';
         return `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:10px;margin-bottom:7px;cursor:pointer;border:1px solid ${euEscalado?'rgba(201,167,106,0.4)':'var(--border)'};" onclick="openEscala('${e.id}')">
-          ${escalaDateBadge(e.data,'small')}
-          <div style="flex:1;">
-            <div style="font-weight:600;font-size:13px;">${e.titulo}</div>
-            <div style="font-size:11px;color:var(--muted);">${weekDay(e.data)} • ${e.hora||''}</div>
-            ${euEscalado ? `<div style="font-size:10px;color:var(--accent2);font-weight:700;margin-top:2px;">🙋 Você está escalado${meObj?(' — '+confirmPill(meObj.confirm)):''}</div>` : ''}
+        <div style="background:var(--surface2);border-radius:10px;margin-bottom:7px;border:1px solid ${euEscalado?'rgba(201,167,106,0.4)':'var(--border)'};">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px;cursor:pointer;" onclick="openEscala('${e.id}')">
+            ${escalaDateBadge(e.data,'small')}
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:13px;">${e.titulo}</div>
+              <div style="font-size:11px;color:var(--muted);">${weekDay(e.data)} • ${e.hora||''}</div>
+              ${euEscalado ? `<div style="font-size:10px;color:var(--accent2);font-weight:700;margin-top:2px;">🙋 Você está escalado${meObj?(' — '+confirmPill(meObj.confirm)):''}</div>` : ''}
+            </div>
+            ${statusTag(e.status)}
           </div>
-          ${statusTag(e.status)}
+          ${isPendente ? `<div style="display:flex;gap:8px;padding:0 10px 10px;border-top:1px solid var(--border);">
+            <button class="btn btn-ghost btn-sm" style="color:var(--green);flex:1;" onclick="confirmarMinhaEscala('${e.id}','confirmado');renderCalendar();">✓ Confirmar presença</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red);flex:1;" onclick="confirmarMinhaEscala('${e.id}','recusado');renderCalendar();">✗ Recusar</button>
+          </div>` : ''}
         </div>`}).join('')
     : '<div class="empty-state" style="padding:30px;"><p>Nenhum evento neste mês</p></div>';
 }
@@ -4590,8 +4614,10 @@ async function syncFromSupabase(membro) {
 
 // ---- Adapters: Supabase → formato local do app ----
 function adaptMembro(m) {
+  const funcao = m.funcao || '';
   return { id: m.id, nome: m.nome, iniciais: m.iniciais || (m.nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase()),
-    av: m.avatar_cor || 'av1', funcao: m.funcao, email: m.email || '', tel: m.telefone || '',
+    av: m.avatar_cor || 'av1', funcao, funcoes: funcao ? [funcao] : [],
+    email: m.email || '', tel: m.telefone || '',
     perm: m.permissao, status: m.status, indisps: [] };
 }
 
