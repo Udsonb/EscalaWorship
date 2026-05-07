@@ -1103,7 +1103,12 @@ body {
           <option>Louvor</option>
           <option>Especiais</option>
         </select>
-        <button class="btn btn-ghost btn-sm" onclick="importarPlaylistSpotify()" style="white-space:nowrap;">🎧 Importar Playlist</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirImportPlaylist()" style="white-space:nowrap;">🎧 Importar Playlist</button>
+      </div>
+      <div id="import-playlist-bar" style="display:none;padding:10px;background:var(--surface2);border-radius:var(--r);border:1px solid var(--border2);margin-bottom:12px;gap:8px;display:none;align-items:center;flex-wrap:wrap;">
+        <input class="form-input" id="import-playlist-url" placeholder="Cole o link da playlist do Spotify..." style="flex:1;min-width:220px;padding:7px 12px;font-size:13px;">
+        <button class="btn btn-primary btn-sm" onclick="executarImportPlaylist()">Importar</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-playlist-bar').style.display='none'">✕</button>
       </div>
       <div class="card">
         <div class="card-header"><h3 id="musicas-count">Repertório</h3></div>
@@ -1228,10 +1233,9 @@ body {
       <div class="card" style="max-width:600px;">
         <div class="card-header"><h3>⚙️ Configurações do Ministério</h3></div>
         <div class="card-body">
-          <div class="form-group"><label class="form-label">Nome do Ministério</label><input class="form-input" value="Igreja Vida Nova"></div>
+          <div class="form-group"><label class="form-label">Nome do Ministério</label><input class="form-input" id="cfg-min-nome" placeholder="Nome da sua igreja/ministério"></div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Tipo</label><select class="form-select"><option>Louvor</option><option>Multimídia</option><option>Dança</option></select></div>
-            <div class="form-group"><label class="form-label">Plano</label><select class="form-select"><option>Gratuito</option><option>Pro</option><option>Premium</option></select></div>
+            <div class="form-group"><label class="form-label">Código de convite</label><input class="form-input" id="cfg-min-codigo" readonly style="background:var(--surface2);color:var(--muted);cursor:default;"></div>
           </div>
           <div class="sec-title">Funções cadastradas</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;" id="funcoes-list"></div>
@@ -1241,7 +1245,7 @@ body {
           <div id="cultos-regulares-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
           <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-culto')" style="margin-bottom:20px;">+ Adicionar culto</button>
 
-          <button class="btn btn-primary" onclick="toast('✅ Salvo!')">Salvar alterações</button>
+          <button class="btn btn-primary" onclick="salvarConfigMinisterio()">Salvar alterações</button>
 
           <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
             <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Zona de risco</div>
@@ -2006,8 +2010,8 @@ function renderDashboard() {
               ? '<span class="tag tag-green">✓ Confirmado</span>'
               : confirm === 'recusado'
               ? '<span class="tag tag-red">✗ Recusado</span>'
-              : `<button class="btn btn-ghost btn-sm" style="color:var(--green);padding:4px 8px;" onclick="confirmarMinhaEscala(${e.id},'confirmado')">✓</button>
-                 <button class="btn btn-ghost btn-sm" style="color:var(--red);padding:4px 8px;" onclick="confirmarMinhaEscala(${e.id},'recusado')">✗</button>`}
+              : `<button class="btn btn-ghost btn-sm" style="color:var(--green);padding:4px 8px;" onclick="confirmarMinhaEscala('${e.id}','confirmado')">✓</button>
+                 <button class="btn btn-ghost btn-sm" style="color:var(--red);padding:4px 8px;" onclick="confirmarMinhaEscala('${e.id}','recusado')">✗</button>`}
           </div>
         </div>`;
       }).join('');
@@ -2114,7 +2118,7 @@ function renderEscalas(filter='todas') {
     const day = String(d.getDate()).padStart(2,'0');
     const mon = d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','').toUpperCase();
     const conf = e.membros.filter(m=>m.confirm==='confirmado').length;
-    return `<div class="escala-card" onclick="openEscala(${e.id})">
+    return `<div class="escala-card" onclick="openEscala('${e.id}')">`
       <div class="escala-date"><div class="eday">${day}</div><div class="emon">${mon}</div></div>
       <div class="escala-info">
         <h4>${e.titulo}</h4>
@@ -2339,7 +2343,7 @@ async function atribuirMembroCadeira(memIdRaw) {
   }
 
   DB.set('escalas', escalas);
-  if (isNew && e.status === 'publicada') notificarMembroEscalado(e, memId, membros);
+  if (isNew) notificarMembroEscalado(e, memId, membros);
   closeModal('modal-cadeira-picker');
   renderCadeiras();
   renderConfirmSummary();
@@ -2855,22 +2859,31 @@ async function saveMusica() {
   toast('✅ Música adicionada ao repertório!');
 }
 
-async function importarPlaylistSpotify() {
+function abrirImportPlaylist() {
   if (!spotifyToken) {
     toast('⚠️ Conecte o Spotify primeiro.');
     localStorage.setItem('_sp_import_intent', '1');
     conectarSpotifyParaBusca();
     return;
   }
-  const url = prompt('Cole o link da Playlist do Spotify:');
-  if (!url) return;
-  const match = url.match(/playlist[\/:]([A-Za-z0-9]+)/);
-  if (!match) { toast('❌ Link de playlist inválido'); return; }
+  const bar = document.getElementById('import-playlist-bar');
+  if (bar) { bar.style.display = bar.style.display === 'none' ? 'flex' : 'none'; }
+}
+
+async function executarImportPlaylist() {
+  const urlInput = document.getElementById('import-playlist-url');
+  const url = urlInput?.value.trim();
+  if (!url) { toast('⚠️ Cole o link da playlist'); return; }
+  const match = url.match(/playlist[/:]([A-Za-z0-9]+)/);
+  if (!match) { toast('❌ Link inválido. Use o link do Spotify: open.spotify.com/playlist/...'); return; }
+  if (!spotifyToken) { toast('⚠️ Conecte o Spotify primeiro'); return; }
   const playlistId = match[1];
+  document.getElementById('import-playlist-bar').style.display = 'none';
   toast('⏳ Importando playlist...');
   try {
     const musicas = DB.get('musicas', []);
-    let offset = 0, added = 0;
+    const novas = [];
+    let offset = 0;
     while (true) {
       const res = await fetch(
         `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&offset=${offset}&market=BR`,
@@ -2880,28 +2893,44 @@ async function importarPlaylistSpotify() {
         spotifyToken = null; localStorage.removeItem('_sp_token'); localStorage.removeItem('_sp_exp');
         toast('❌ Token expirado. Reconecte o Spotify.'); conectarSpotifyParaBusca(); return;
       }
-      if (!res.ok) throw new Error('Erro ao buscar playlist');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       const d = await res.json();
       for (const item of (d.items || [])) {
         const t = item.track;
         if (!t || t.type !== 'track') continue;
         const link = t.external_urls?.spotify || '';
-        if (!musicas.some(m => (link && m.spotify === link) || m.titulo.toLowerCase() === t.name.toLowerCase())) {
-          musicas.push({
-            id: Math.max(0, ...musicas.map(m => m.id)) + 1,
-            titulo: t.name, artista: t.artists?.map(a => a.name).join(', ') || '',
-            tom: '', bpm: '', spotify: link, youtube: '', cifra: '', pasta: 'Louvor'
-          });
-          added++;
+        const titulo = t.name;
+        if (!musicas.some(m => (link && m.spotify === link) || m.titulo.toLowerCase() === titulo.toLowerCase())) {
+          novas.push({ titulo, artista: t.artists?.map(a => a.name).join(', ') || '', spotify: link, pasta: 'Louvor' });
         }
       }
       offset += d.items.length;
       if (offset >= d.total || offset >= 200 || !d.items.length) break;
     }
+    if (!novas.length) { toast('ℹ️ Nenhuma música nova encontrada na playlist'); return; }
+    // Save to Supabase
+    if (supabase && MIN_ID) {
+      const { data: rows, error } = await supabase.from('musicas').insert(
+        novas.map(m => ({ ministerio_id: MIN_ID, titulo: m.titulo, artista: m.artista, pasta: m.pasta, link_spotify: m.spotify, criado_por: ME.id }))
+      ).select('id, titulo, artista, pasta, link_spotify');
+      if (!error && rows) {
+        rows.forEach(r => musicas.push({ id: r.id, titulo: r.titulo, artista: r.artista || '', tom: '', bpm: '', spotify: r.link_spotify || '', youtube: '', cifra: '', pasta: r.pasta || 'Louvor' }));
+        DB.set('musicas', musicas);
+        renderMusicas();
+        toast(`✅ ${rows.length} músicas importadas!`);
+        if (urlInput) urlInput.value = '';
+        return;
+      }
+    }
+    // Fallback: save locally with numeric IDs
+    const numIds = musicas.map(m => m.id).filter(id => typeof id === 'number' && !isNaN(id));
+    let nextId = numIds.length ? Math.max(...numIds) + 1 : 1;
+    novas.forEach(m => { musicas.push({ id: nextId++, ...m, tom: '', bpm: '', youtube: '', cifra: '' }); });
     DB.set('musicas', musicas);
     renderMusicas();
-    toast(`✅ ${added} músicas importadas da playlist!`);
-  } catch(e) { toast('❌ ' + e.message); }
+    toast(`✅ ${novas.length} músicas importadas!`);
+    if (urlInput) urlInput.value = '';
+  } catch(err) { toast('❌ ' + err.message); }
 }
 
 /* ================================================================
@@ -2938,8 +2967,8 @@ function renderAvisos() {
                   ? '<span class="tag tag-green">✓ Confirmado</span>'
                   : confirm === 'recusado'
                   ? '<span class="tag tag-red">✗ Recusado</span>'
-                  : `<button class="btn btn-ghost btn-sm" style="color:var(--green);" onclick="confirmarMinhaEscala(${e.id},'confirmado');renderAvisos();">✓ Confirmar</button>
-                     <button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="confirmarMinhaEscala(${e.id},'recusado');renderAvisos();">✗ Recusar</button>`}
+                  : `<button class="btn btn-ghost btn-sm" style="color:var(--green);" onclick="confirmarMinhaEscala('${e.id}','confirmado');renderAvisos();">✓ Confirmar</button>
+                     <button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="confirmarMinhaEscala('${e.id}','recusado');renderAvisos();">✗ Recusar</button>`}
               </div>
             </div>`;
           }).join('')}
@@ -3087,7 +3116,7 @@ function renderCalendar() {
         const euEscalado = ME.id && (e.membros||[]).some(m => String(m.id)===String(ME.id));
         const meObj = euEscalado ? (e.membros||[]).find(m => String(m.id)===String(ME.id)) : null;
         return `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:10px;margin-bottom:7px;cursor:pointer;border:1px solid ${euEscalado?'rgba(201,167,106,0.4)':'var(--border)'};" onclick="openEscala(${e.id})">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:10px;margin-bottom:7px;cursor:pointer;border:1px solid ${euEscalado?'rgba(201,167,106,0.4)':'var(--border)'};" onclick="openEscala('${e.id}')">`
           ${escalaDateBadge(e.data,'small')}
           <div style="flex:1;">
             <div style="font-weight:600;font-size:13px;">${e.titulo}</div>
@@ -3442,6 +3471,10 @@ function limparCacheLocal() {
 }
 
 function renderMinisterio() {
+  const nomeEl = document.getElementById('cfg-min-nome');
+  const codEl  = document.getElementById('cfg-min-codigo');
+  if (nomeEl) nomeEl.value = MIN_NOME || '';
+  if (codEl)  codEl.value  = MIN_CODIGO || '';
   renderCultosRegulares();
   const ativas = DB.get('ministerio_funcoes', FUNCOES_LISTA);
   document.getElementById('funcoes-list').innerHTML = ativas.map(f =>
@@ -3453,6 +3486,18 @@ function renderMinisterio() {
     </span>`
   ).join('') +
   `<button onclick="abrirAddFuncao()" style="padding:5px 12px;background:var(--surface3);border:1px dashed var(--border2);border-radius:99px;color:var(--muted);font-size:12px;cursor:pointer;">+ Adicionar</button>`;
+}
+
+async function salvarConfigMinisterio() {
+  const novoNome = document.getElementById('cfg-min-nome')?.value.trim();
+  if (!novoNome) { toast('⚠️ Digite o nome do ministério'); return; }
+  MIN_NOME = novoNome;
+  atualizarSidebar();
+  if (supabase && MIN_ID) {
+    const { error } = await supabase.from('ministerios').update({ nome: novoNome }).eq('id', MIN_ID);
+    if (error) { toast('❌ Erro ao salvar: ' + error.message); return; }
+  }
+  toast('✅ Nome do ministério salvo!');
 }
 
 function removeFuncao(f) {
@@ -3952,7 +3997,7 @@ async function _trocarSpotifyCode(code) {
       // Se usuário tentou importar playlist antes de conectar, retoma automaticamente
       if (localStorage.getItem('_sp_import_intent')) {
         localStorage.removeItem('_sp_import_intent');
-        setTimeout(() => { navigate('musicas'); importarPlaylistSpotify(); }, 600);
+        setTimeout(() => { navigate('musicas'); abrirImportPlaylist(); }, 600);
       }
     } else {
       toast('❌ Erro Spotify: ' + (d.error_description || d.error || 'Tente reconectar'));
