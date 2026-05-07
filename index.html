@@ -841,7 +841,7 @@ body {
   </div>
   <div class="nav-item" data-nav="escalas" onclick="navigate('escalas')">
     <span class="ni">📋</span> Escalas
-    <span class="nbadge">3</span>
+    <span class="nbadge" id="badge-escalas" style="display:none;">0</span>
   </div>
   <div class="nav-item" data-nav="agenda" onclick="navigate('agenda')">
     <span class="ni">📅</span> Agenda
@@ -859,7 +859,7 @@ body {
   </div>
   <div class="nav-item" data-nav="avisos" onclick="navigate('avisos')">
     <span class="ni">🔔</span> Avisos
-    <span class="nbadge">2</span>
+    <span class="nbadge" id="badge-avisos" style="display:none;">0</span>
   </div>
   <div class="nav-item" data-nav="chat" onclick="navigate('chat')">
     <span class="ni">💬</span> Chat
@@ -899,10 +899,10 @@ body {
     <!-- ==================== DASHBOARD ==================== -->
     <div class="view active" id="view-dashboard">
       <div class="grid4 mb20">
-        <div class="stat-card sc1"><div class="stat-icon">📋</div><div class="stat-value">3</div><div class="stat-label">Escalas este mês</div></div>
-        <div class="stat-card sc2"><div class="stat-icon">👥</div><div class="stat-value">12</div><div class="stat-label">Membros ativos</div></div>
-        <div class="stat-card sc3"><div class="stat-icon">🎵</div><div class="stat-value">47</div><div class="stat-label">Músicas no repertório</div></div>
-        <div class="stat-card sc4"><div class="stat-icon">⏳</div><div class="stat-value">5</div><div class="stat-label">Confirmações pendentes</div></div>
+        <div class="stat-card sc1"><div class="stat-icon">📋</div><div class="stat-value" id="stat-escalas">0</div><div class="stat-label">Escalas este mês</div></div>
+        <div class="stat-card sc2"><div class="stat-icon">👥</div><div class="stat-value" id="stat-membros">0</div><div class="stat-label">Membros ativos</div></div>
+        <div class="stat-card sc3"><div class="stat-icon">🎵</div><div class="stat-value" id="stat-musicas">0</div><div class="stat-label">Músicas no repertório</div></div>
+        <div class="stat-card sc4"><div class="stat-icon">⏳</div><div class="stat-value" id="stat-pendentes">0</div><div class="stat-label">Confirmações pendentes</div></div>
       </div>
 
       <div class="grid2 mb20">
@@ -929,6 +929,15 @@ body {
           <button class="btn btn-ghost btn-sm" onclick="navigate('avisos')">Ver todos</button>
         </div>
         <div class="card-body" id="dash-avisos"></div>
+      </div>
+
+      <!-- Minhas Escalas (para o membro logado) -->
+      <div class="card mb20" id="card-minhas-escalas" style="display:none;">
+        <div class="card-header">
+          <h3>🙋 Minhas Escalas</h3>
+          <span style="font-size:11px;color:var(--muted);">Confirme sua presença</span>
+        </div>
+        <div class="card-body" id="dash-minhas-escalas"></div>
       </div>
 
       <!-- Google Agenda sync banner -->
@@ -1094,6 +1103,7 @@ body {
 
     <!-- ==================== AVISOS ==================== -->
     <div class="view" id="view-avisos">
+      <div id="avisos-minhas-escalas"></div>
       <div id="avisos-list"></div>
     </div>
 
@@ -1186,39 +1196,19 @@ body {
     <!-- ==================== RELATÓRIOS ==================== -->
     <div class="view" id="view-relatorios">
       <div class="grid4 mb20">
-        <div class="stat-card sc1"><div class="stat-icon">📋</div><div class="stat-value">18</div><div class="stat-label">Escalas este ano</div></div>
-        <div class="stat-card sc2"><div class="stat-icon">✅</div><div class="stat-value">94%</div><div class="stat-label">Taxa de confirmação</div></div>
-        <div class="stat-card sc3"><div class="stat-icon">🎵</div><div class="stat-value">47</div><div class="stat-label">Músicas ativas</div></div>
-        <div class="stat-card sc4"><div class="stat-icon">❌</div><div class="stat-value">3</div><div class="stat-label">Faltas registradas</div></div>
+        <div class="stat-card sc1"><div class="stat-icon">📋</div><div class="stat-value" id="rel-escalas-ano">0</div><div class="stat-label">Escalas este ano</div></div>
+        <div class="stat-card sc2"><div class="stat-icon">✅</div><div class="stat-value" id="rel-taxa">—</div><div class="stat-label">Taxa de confirmação</div></div>
+        <div class="stat-card sc3"><div class="stat-icon">🎵</div><div class="stat-value" id="rel-musicas">0</div><div class="stat-label">Músicas no repertório</div></div>
+        <div class="stat-card sc4"><div class="stat-icon">👥</div><div class="stat-value" id="rel-membros">0</div><div class="stat-label">Membros ativos</div></div>
       </div>
       <div class="grid2">
         <div class="card">
           <div class="card-header"><h3>🏆 Membros mais escalados</h3></div>
-          <div class="card-body">
-            <div class="member-row"><div class="avatar av1">RB</div><div class="m-info"><div class="name">Ricardo Barbosa</div><div class="role">Guitarra</div></div><span class="tag tag-purple">14×</span></div>
-            <div class="member-row"><div class="avatar av2">CM</div><div class="m-info"><div class="name">Carla Menezes</div><div class="role">Vocal</div></div><span class="tag tag-purple">13×</span></div>
-            <div class="member-row"><div class="avatar av3">TS</div><div class="m-info"><div class="name">Thiago Santos</div><div class="role">Bateria</div></div><span class="tag tag-purple">12×</span></div>
-          </div>
+          <div class="card-body" id="rel-top-membros"></div>
         </div>
         <div class="card">
           <div class="card-header"><h3>🎵 Músicas mais tocadas</h3></div>
-          <div class="card-body">
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-              <div style="width:28px;height:28px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);">1</div>
-              <div style="flex:1;"><div style="font-weight:600;font-size:13px;">Oceans</div><div style="font-size:11px;color:var(--muted);">Hillsong</div></div>
-              <span class="tag tag-gold">8×</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-              <div style="width:28px;height:28px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);">2</div>
-              <div style="flex:1;"><div style="font-weight:600;font-size:13px;">Way Maker</div><div style="font-size:11px;color:var(--muted);">Sinach</div></div>
-              <span class="tag tag-gold">6×</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;">
-              <div style="width:28px;height:28px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);">3</div>
-              <div style="flex:1;"><div style="font-weight:600;font-size:13px;">Goodness of God</div><div style="font-size:11px;color:var(--muted);">Bethel</div></div>
-              <span class="tag tag-gold">5×</span>
-            </div>
-          </div>
+          <div class="card-body" id="rel-top-musicas"></div>
         </div>
       </div>
     </div>
@@ -1863,6 +1853,7 @@ function navigate(page, extra) {
   if (page === 'chat')           renderChat();
   if (page === 'agenda')          { renderCalendar(); updateSpotifyCard(); }
   if (page === 'disponibilidade') renderDisponibilidade();
+  if (page === 'relatorios')      renderRelatorios();
   if (page === 'ministerio')      renderMinisterio();
 }
 
@@ -1914,45 +1905,177 @@ function switchTab(btn, tabId) {
    RENDER: DASHBOARD
 ================================================================ */
 function renderDashboard() {
-  const escalas = DB.get('escalas',[]);
-  const membros = DB.get('membros',[]);
-  const avisos  = DB.get('avisos',[]);
+  const escalas = DB.get('escalas', []);
+  const membros = DB.get('membros', []);
+  const musicas = DB.get('musicas', []);
+  const avisos  = DB.get('avisos', []);
+  const hoje    = new Date().toISOString().split('T')[0];
+  const mesAtual = hoje.slice(0, 7); // YYYY-MM
+
+  // Stats dinâmicos
+  const escalasEsteMes = escalas.filter(e => e.data && e.data.startsWith(mesAtual)).length;
+  const membrosAtivos  = membros.filter(m => m.status !== 'inativo').length;
+  const totalMusicas   = musicas.length;
+  const proxEscala     = escalas.find(e => e.data >= hoje);
+  const pendentes      = proxEscala
+    ? proxEscala.membros.filter(m => m.confirm === 'pendente').length : 0;
+
+  document.getElementById('stat-escalas').textContent  = escalasEsteMes;
+  document.getElementById('stat-membros').textContent  = membrosAtivos;
+  document.getElementById('stat-musicas').textContent  = totalMusicas;
+  document.getElementById('stat-pendentes').textContent = pendentes;
+
+  // Badges sidebar
+  const minhasPendentes = ME.id
+    ? escalas.filter(e => e.data >= hoje && e.membros.some(m => String(m.id) === String(ME.id) && m.confirm === 'pendente')).length
+    : 0;
+  const badgeEsc = document.getElementById('badge-escalas');
+  if (badgeEsc) { badgeEsc.textContent = minhasPendentes; badgeEsc.style.display = minhasPendentes ? '' : 'none'; }
+  const avisosGerais = avisos.filter(a => !a.membroId);
+  const badgeAv = document.getElementById('badge-avisos');
+  if (badgeAv) { badgeAv.textContent = avisosGerais.length; badgeAv.style.display = avisosGerais.length ? '' : 'none'; }
 
   // Próximas escalas
-  const dashEsc = document.getElementById('dash-escalas');
-  dashEsc.innerHTML = escalas.slice(0,3).map(e => `
-    <div onclick="openEscala(${e.id})" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" class="esc-row-hover">
-      ${escalaDateBadge(e.data,'small')}
+  const proximas = escalas.filter(e => e.data >= hoje).slice(0, 3);
+  document.getElementById('dash-escalas').innerHTML = proximas.map(e => `
+    <div onclick="openEscala('${e.id}')" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+      ${escalaDateBadge(e.data, 'small')}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.titulo}</div>
-        <div style="font-size:11px;color:var(--muted);">${e.membros.length} membros</div>
+        <div style="font-size:11px;color:var(--muted);">${e.hora || ''} • ${e.membros.length} membros</div>
       </div>
       ${statusTag(e.status)}
     </div>
-  `).join('') || '<div class="empty-state"><div class="ei">📋</div><p>Nenhuma escala</p></div>';
+  `).join('') || '<div class="empty-state"><div class="ei">📋</div><p>Nenhuma escala futura</p></div>';
 
-  // Confirmações
-  const esc1 = escalas[0];
+  // Confirmações da próxima escala
   const dashConf = document.getElementById('dash-confirms');
-  if (esc1) {
-    dashConf.innerHTML = esc1.membros.slice(0,5).map(me => {
-      const m = membros.find(x=>x.id===me.id);
+  if (proxEscala && proxEscala.membros.length) {
+    dashConf.innerHTML = proxEscala.membros.slice(0, 6).map(me => {
+      const m = membros.find(x => x.id === me.id);
       if (!m) return '';
       return `<div class="member-row">
         <div class="avatar ${m.av}">${m.iniciais}</div>
-        <div class="m-info"><div class="name">${m.nome}</div><div class="role">${memberFuncoes(m).join(', ')}</div></div>
+        <div class="m-info"><div class="name">${m.nome}</div><div class="role">${m.funcao || ''}</div></div>
         ${confirmPill(me.confirm)}
       </div>`;
     }).join('');
+  } else {
+    dashConf.innerHTML = '<div class="empty-state" style="padding:20px;"><p>Nenhum membro escalado ainda</p></div>';
   }
 
   // Avisos
-  document.getElementById('dash-avisos').innerHTML = avisos.slice(0,2).map(a => `
-    <div class="aviso-card ${a.tipo==='urgente'?'urg':a.tipo==='info'?'info':''}">
+  const avisosGerais = avisos.filter(a => !a.membroId);
+  document.getElementById('dash-avisos').innerHTML = avisosGerais.slice(0, 2).map(a => `
+    <div class="aviso-card ${a.tipo === 'urgente' ? 'urg' : a.tipo === 'info' ? 'info' : ''}">
       <h4>${a.titulo}</h4><p>${a.msg}</p>
       <div class="av-meta">Por ${a.por} • ${a.quando}</div>
     </div>
-  `).join('');
+  `).join('') || '<div class="empty-state" style="padding:16px;"><p>Nenhum aviso</p></div>';
+
+  // Minhas escalas (para o membro logado)
+  const cardMinhas = document.getElementById('card-minhas-escalas');
+  const dashMinhas = document.getElementById('dash-minhas-escalas');
+  if (cardMinhas && ME.id) {
+    const minhasEscalas = escalas
+      .filter(e => e.data >= hoje && e.membros.some(m => String(m.id) === String(ME.id)))
+      .sort((a, b) => a.data.localeCompare(b.data));
+    if (minhasEscalas.length) {
+      cardMinhas.style.display = '';
+      dashMinhas.innerHTML = minhasEscalas.map(e => {
+        const me = e.membros.find(m => String(m.id) === String(ME.id));
+        const confirm = me ? me.confirm : 'pendente';
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+          ${escalaDateBadge(e.data, 'small')}
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.titulo}</div>
+            <div style="font-size:11px;color:var(--muted);">${e.hora || ''} • ${weekDay(e.data)}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            ${confirm === 'confirmado'
+              ? '<span class="tag tag-green">✓ Confirmado</span>'
+              : confirm === 'recusado'
+              ? '<span class="tag tag-red">✗ Recusado</span>'
+              : `<button class="btn btn-ghost btn-sm" style="color:var(--green);padding:4px 8px;" onclick="confirmarMinhaEscala(${e.id},'confirmado')">✓</button>
+                 <button class="btn btn-ghost btn-sm" style="color:var(--red);padding:4px 8px;" onclick="confirmarMinhaEscala(${e.id},'recusado')">✗</button>`}
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      cardMinhas.style.display = 'none';
+    }
+  }
+}
+
+/* ================================================================
+   RENDER: RELATÓRIOS
+================================================================ */
+function renderRelatorios() {
+  const escalas = DB.get('escalas', []);
+  const membros = DB.get('membros', []);
+  const musicas = DB.get('musicas', []);
+  const anoAtual = new Date().getFullYear().toString();
+
+  const escalasAno   = escalas.filter(e => e.data && e.data.startsWith(anoAtual)).length;
+  const membrosAtivos = membros.filter(m => m.status !== 'inativo').length;
+
+  let totalAlocados = 0, totalConf = 0;
+  escalas.forEach(e => {
+    totalAlocados += e.membros.length;
+    totalConf += e.membros.filter(m => m.confirm === 'confirmado').length;
+  });
+  const taxa = totalAlocados ? Math.round((totalConf / totalAlocados) * 100) + '%' : '—';
+
+  document.getElementById('rel-escalas-ano').textContent = escalasAno;
+  document.getElementById('rel-taxa').textContent        = taxa;
+  document.getElementById('rel-musicas').textContent     = musicas.length;
+  document.getElementById('rel-membros').textContent     = membrosAtivos;
+
+  // Top membros mais escalados
+  const memCount = {};
+  escalas.forEach(e => e.membros.forEach(me => { memCount[me.id] = (memCount[me.id] || 0) + 1; }));
+  const topMembros = Object.entries(memCount)
+    .sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([id, count]) => {
+      const m = membros.find(x => String(x.id) === String(id));
+      return m ? { ...m, count } : null;
+    }).filter(Boolean);
+
+  document.getElementById('rel-top-membros').innerHTML = topMembros.length
+    ? topMembros.map((m, i) => `
+        <div class="member-row" style="padding:8px 0;border-bottom:1px solid var(--border);">
+          <div style="font-weight:700;color:var(--muted);width:20px;font-size:12px;">${i + 1}°</div>
+          <div class="avatar ${m.av}">${m.iniciais}</div>
+          <div class="m-info" style="flex:1;"><div class="name">${m.nome}</div><div class="role">${m.funcao || ''}</div></div>
+          <div style="font-size:13px;font-weight:700;color:var(--primary);">${m.count}x</div>
+        </div>`).join('')
+    : '<div class="empty-state" style="padding:16px;"><p>Nenhuma escala ainda</p></div>';
+
+  // Top músicas mais tocadas
+  const musCount = {};
+  escalas.forEach(e => (e.slots || []).forEach(s => { if (s.nome) musCount[s.nome] = (musCount[s.nome] || 0) + 1; }));
+  const topMusicas = Object.entries(musCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  document.getElementById('rel-top-musicas').innerHTML = topMusicas.length
+    ? topMusicas.map(([nome, count], i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+          <div style="font-weight:700;color:var(--muted);width:20px;font-size:12px;">${i + 1}°</div>
+          <div style="flex:1;font-size:13px;font-weight:600;">${nome}</div>
+          <div style="font-size:13px;font-weight:700;color:var(--primary);">${count}x</div>
+        </div>`).join('')
+    : '<div class="empty-state" style="padding:16px;"><p>Nenhuma música escalada ainda</p></div>';
+}
+
+function confirmarMinhaEscala(escalaId, confirmacao) {
+  const escalas = DB.get('escalas', []);
+  const e = escalas.find(x => x.id === escalaId);
+  if (!e) return;
+  const me = e.membros.find(m => String(m.id) === String(ME.id));
+  if (!me) return;
+  me.confirm = confirmacao;
+  DB.set('escalas', escalas);
+  renderDashboard();
+  toast(confirmacao === 'confirmado' ? '✅ Presença confirmada!' : '❌ Presença recusada');
 }
 
 /* ================================================================
@@ -2189,7 +2312,8 @@ function atribuirMembroCadeira(memIdRaw) {
 
   c.membroId = memId;
 
-  if (!e.membros.find(x => String(x.id) === String(memId))) {
+  const isNew = !e.membros.find(x => String(x.id) === String(memId));
+  if (isNew) {
     e.membros.push({ id: memId, confirm: 'pendente' });
   }
 
@@ -2199,6 +2323,7 @@ function atribuirMembroCadeira(memIdRaw) {
   }
 
   DB.set('escalas', escalas);
+  if (isNew && e.status === 'publicada') notificarMembroEscalado(e, memId, membros);
   closeModal('modal-cadeira-picker');
   renderCadeiras();
   renderConfirmSummary();
@@ -2730,9 +2855,51 @@ async function importarPlaylistSpotify() {
    RENDER: AVISOS
 ================================================================ */
 function renderAvisos() {
-  const avisos = DB.get('avisos',[]);
-  document.getElementById('avisos-list').innerHTML = avisos.map(a => `
-    <div class="aviso-card ${a.tipo==='urgente'?'urg':a.tipo==='info'?'info':''}">
+  const avisos = DB.get('avisos', []);
+  const hoje = new Date().toISOString().split('T')[0];
+  const escalas = DB.get('escalas', []);
+
+  // Minhas escalas pendentes de confirmação
+  const minhasEscalas = ME.id
+    ? escalas.filter(e => e.data >= hoje && e.membros.some(m => String(m.id) === String(ME.id)))
+        .sort((a, b) => a.data.localeCompare(b.data))
+    : [];
+
+  const containerMinhas = document.getElementById('avisos-minhas-escalas');
+  if (containerMinhas && minhasEscalas.length) {
+    containerMinhas.innerHTML = `
+      <div class="card mb20">
+        <div class="card-header"><h3>🙋 Minhas Escalas</h3></div>
+        <div class="card-body">
+          ${minhasEscalas.map(e => {
+            const me = e.membros.find(m => String(m.id) === String(ME.id));
+            const confirm = me ? me.confirm : 'pendente';
+            return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+              ${escalaDateBadge(e.data, 'small')}
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:13px;">${e.titulo}</div>
+                <div style="font-size:11px;color:var(--muted);">${weekDay(e.data)} • ${e.hora || ''}</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0;">
+                ${confirm === 'confirmado'
+                  ? '<span class="tag tag-green">✓ Confirmado</span>'
+                  : confirm === 'recusado'
+                  ? '<span class="tag tag-red">✗ Recusado</span>'
+                  : `<button class="btn btn-ghost btn-sm" style="color:var(--green);" onclick="confirmarMinhaEscala(${e.id},'confirmado');renderAvisos();">✓ Confirmar</button>
+                     <button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="confirmarMinhaEscala(${e.id},'recusado');renderAvisos();">✗ Recusar</button>`}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  } else if (containerMinhas) {
+    containerMinhas.innerHTML = '';
+  }
+
+  // Avisos gerais (sem membroId = para todos)
+  const avisosGerais = avisos.filter(a => !a.membroId);
+  document.getElementById('avisos-list').innerHTML = avisosGerais.map(a => `
+    <div class="aviso-card ${a.tipo === 'urgente' ? 'urg' : a.tipo === 'info' ? 'info' : ''}">
       <h4>${a.titulo}</h4><p>${a.msg}</p>
       <div class="av-meta">Por ${a.por} • ${a.quando}</div>
     </div>
@@ -3349,8 +3516,31 @@ function publishEscala() {
   const e = escalas.find(x=>x.id===currentEscalaId);
   e.status = 'publicada';
   DB.set('escalas', escalas);
+  // Notify all members in this escala
+  const membros = DB.get('membros',[]);
+  e.membros.forEach(me => notificarMembroEscalado(e, me.id, membros));
   renderEscalaDetail(currentEscalaId);
-  toast('📢 Escala publicada!');
+  toast('📢 Escala publicada! Membros notificados.');
+}
+
+function notificarMembroEscalado(e, memId, membros) {
+  // Only notify others (not the admin publishing), and skip if it's your own browser
+  const m = membros.find(x => String(x.id) === String(memId));
+  if (!m) return;
+  const avisos = DB.get('avisos', []);
+  const jaExiste = avisos.some(a => a._escalaNotif && a._escalaNotif === `${e.id}-${memId}`);
+  if (jaExiste) return;
+  avisos.unshift({
+    id: Date.now() + Math.random(),
+    _escalaNotif: `${e.id}-${memId}`,
+    membroId: memId,
+    tipo: 'escala-convite',
+    titulo: `📋 Você foi escalado: ${e.titulo}`,
+    msg: `${weekDay(e.data)}${e.hora ? ' • ' + e.hora : ''}`,
+    por: ME.nome || 'Líder',
+    quando: new Date().toLocaleDateString('pt-BR'),
+  });
+  DB.set('avisos', avisos);
 }
 
 /* ================================================================
