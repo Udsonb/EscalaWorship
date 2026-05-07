@@ -1965,7 +1965,6 @@ function renderDashboard() {
   }
 
   // Avisos
-  const avisosGerais = avisos.filter(a => !a.membroId);
   document.getElementById('dash-avisos').innerHTML = avisosGerais.slice(0, 2).map(a => `
     <div class="aviso-card ${a.tipo === 'urgente' ? 'urg' : a.tipo === 'info' ? 'info' : ''}">
       <h4>${a.titulo}</h4><p>${a.msg}</p>
