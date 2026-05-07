@@ -1811,6 +1811,7 @@ let calYear = 2026, calMonth = 4;
 const ME = { id:1, nome:'Ricardo Barbosa', iniciais:'RB', av:'av1' };
 let MIN_CODIGO = '';
 let MIN_NOME   = '';
+let MIN_ID     = null;
 
 // URL base do app (funciona tanto no Netlify quanto no GitHub Pages /subpath/)
 function appBaseUrl() {
@@ -2086,6 +2087,7 @@ function confirmarMinhaEscala(escalaId, confirmacao) {
   if (!me) return;
   me.confirm = confirmacao;
   DB.set('escalas', escalas);
+  if (supabase) supabase.from('escala_membros').update({ confirmacao, respondido_em: new Date().toISOString() }).eq('escala_id', escalaId).eq('membro_id', ME.id).then(({error}) => { if (error) console.error('confirm:', error); });
   renderDashboard();
   toast(confirmacao === 'confirmado' ? '✅ Presença confirmada!' : '❌ Presença recusada');
 }
@@ -2311,7 +2313,7 @@ function abrirCadeiraPicker(idx) {
   openModal('modal-cadeira-picker');
 }
 
-function atribuirMembroCadeira(memIdRaw) {
+async function atribuirMembroCadeira(memIdRaw) {
   const membros = DB.get('membros',[]);
   const m = membros.find(x => String(x.id) === String(memIdRaw));
   if (!m) { toast('⚠️ Membro não encontrado'); return; }
@@ -2327,11 +2329,15 @@ function atribuirMembroCadeira(memIdRaw) {
   const isNew = !e.membros.find(x => String(x.id) === String(memId));
   if (isNew) {
     e.membros.push({ id: memId, confirm: 'pendente' });
+    if (supabase) supabase.from('escala_membros').upsert({ escala_id: currentEscalaId, membro_id: memId, confirmacao: 'pendente' }, { onConflict: 'escala_id,membro_id' }).then(({error}) => { if (error) console.error('escala_membros upsert:', error); });
   }
 
   if (prevId && String(prevId) !== String(memId)) {
     const stillInOther = e.cadeiras.some(cc => String(cc.membroId) === String(prevId));
-    if (!stillInOther) e.membros = e.membros.filter(x => String(x.id) !== String(prevId));
+    if (!stillInOther) {
+      e.membros = e.membros.filter(x => String(x.id) !== String(prevId));
+      if (supabase) supabase.from('escala_membros').delete().eq('escala_id', currentEscalaId).eq('membro_id', prevId).then(({error}) => { if (error) console.error('escala_membros delete:', error); });
+    }
   }
 
   DB.set('escalas', escalas);
@@ -2348,7 +2354,10 @@ function removerDaCadeira(idx) {
   const memId = e.cadeiras[idx].membroId;
   e.cadeiras[idx].membroId = null;
   const stillInOther = e.cadeiras.some(cc => String(cc.membroId) === String(memId));
-  if (!stillInOther) e.membros = e.membros.filter(x => String(x.id) !== String(memId));
+  if (!stillInOther) {
+    e.membros = e.membros.filter(x => String(x.id) !== String(memId));
+    if (supabase) supabase.from('escala_membros').delete().eq('escala_id', currentEscalaId).eq('membro_id', memId).then(({error}) => { if (error) console.error('escala_membros delete:', error); });
+  }
   DB.set('escalas', escalas);
   renderCadeiras();
   renderConfirmSummary();
@@ -2521,6 +2530,11 @@ function saveSlot() {
     const s = e.slots.find(x=>x.pos===editingSlotPos);
     Object.assign(s, data);
     if (!s.escolhidoPor) s.escolhidoPor = ME.id;
+    // Sync slot to Supabase
+    if (supabase) {
+      const slotRow = { escala_id: currentEscalaId, posicao: editingSlotPos, nome: data.nome, artista: data.artista, tom: data.tom, bpm: data.bpm ? parseInt(data.bpm) : null, tipo_especial: data.tipo || '', link_spotify: data.spotify, link_youtube: data.youtube, link_cifra: data.cifra, escolhido_por: ME.id };
+      supabase.from('escala_slots').upsert(slotRow, { onConflict: 'escala_id,posicao' }).then(({error}) => { if (error) console.error('slot save:', error); });
+    }
   }
   DB.set('escalas', escalas);
   // Auto-adiciona ao repertório se a música ainda não estiver lá
@@ -2531,8 +2545,12 @@ function saveSlot() {
       m.titulo.toLowerCase() === data.nome.toLowerCase()
     );
     if (!existe) {
+      let musId = Math.max(0, ...musicas.map(m => m.id)) + 1;
+      if (supabase && MIN_ID) {
+        supabase.from('musicas').insert({ ministerio_id: MIN_ID, titulo: data.nome, artista: data.artista || '', tom: data.tom || '', bpm: data.bpm ? parseInt(data.bpm) : null, link_spotify: data.spotify || '', link_youtube: data.youtube || '', link_cifra: data.cifra || '', pasta: 'Louvor', criado_por: ME.id }).select('id').single().then(({data: r}) => { if (r) { const ms = DB.get('musicas', []); const found = ms.find(x => x.id === musId); if (found) { found.id = r.id; DB.set('musicas', ms); } } });
+      }
       musicas.push({
-        id: Math.max(0, ...musicas.map(m => m.id)) + 1,
+        id: musId,
         titulo: data.nome, artista: data.artista || '',
         tom: data.tom || '', bpm: data.bpm || '',
         spotify: data.spotify || '', youtube: data.youtube || '',
@@ -2726,37 +2744,52 @@ function renderIndisps(m) {
   `).join('');
 }
 
-function saveIndisp() {
+async function saveIndisp() {
   const inicio = document.getElementById('ind-inicio').value;
   const fim    = document.getElementById('ind-fim').value;
   if (!inicio || !fim) { toast('⚠️ Preencha as datas'); return; }
   if (inicio > fim) { toast('⚠️ Data inicial deve ser antes da final'); return; }
 
+  const tipo   = document.getElementById('ind-tipo').value;
+  const motivo = document.getElementById('ind-motivo').value.trim();
+  let newId;
+
+  if (supabase && MIN_ID) {
+    const { data: row, error } = await supabase.from('indisponibilidades').insert({
+      membro_id: editingMembroId,
+      ministerio_id: MIN_ID,
+      data_inicio: inicio,
+      data_fim: fim,
+      tipo,
+      motivo
+    }).select().single();
+    if (error) { console.error('indisp save:', error); toast('❌ Erro ao salvar: ' + error.message); return; }
+    newId = row.id;
+  } else {
+    newId = Date.now();
+  }
+
   const membros = DB.get('membros',[]);
-  const m = membros.find(x=>x.id===editingMembroId);
-  const newId = Math.max(0,...(m.indisps||[]).map(i=>i.id))+1;
-  if (!m.indisps) m.indisps = [];
-  m.indisps.push({
-    id: newId,
-    inicio,
-    fim,
-    tipo: document.getElementById('ind-tipo').value,
-    motivo: document.getElementById('ind-motivo').value.trim()
-  });
-  m.status = 'indisponivel';
-  DB.set('membros', membros);
+  const m = membros.find(x => String(x.id) === String(editingMembroId));
+  if (m) {
+    if (!m.indisps) m.indisps = [];
+    m.indisps.push({ id: newId, inicio, fim, tipo, motivo });
+    m.status = 'indisponivel';
+    DB.set('membros', membros);
+  }
   closeModal('modal-indisp');
-  if (editingMembroId === ME.id) renderDisponibilidade();
+  if (String(editingMembroId) === String(ME.id)) renderDisponibilidade();
   else renderMembroDetail(editingMembroId);
   toast('🚫 Indisponibilidade declarada');
 }
 
-function removeIndisp(mId, iId) {
+async function removeIndisp(mId, iId) {
   const membros = DB.get('membros',[]);
-  const m = membros.find(x=>x.id===mId);
-  m.indisps = m.indisps.filter(i=>i.id!==iId);
+  const m = membros.find(x => String(x.id) === String(mId));
+  m.indisps = (m.indisps || []).filter(i => i.id !== iId);
   if (!m.indisps.length) m.status = 'ativo';
   DB.set('membros', membros);
+  if (supabase) supabase.from('indisponibilidades').delete().eq('id', iId).then(({error}) => { if (error) console.error('removeIndisp:', error); });
   renderMembroDetail(mId);
   toast('✅ Indisponibilidade removida');
 }
@@ -2793,22 +2826,31 @@ function renderMusicas() {
   `).join('') || '<div class="empty-state"><div class="ei">🎵</div><h3>Nenhuma música</h3></div>';
 }
 
-function saveMusica() {
+async function saveMusica() {
   const titulo = document.getElementById('nm-titulo').value.trim();
   if (!titulo) { toast('⚠️ Digite o nome da música'); return; }
+  const artista = document.getElementById('nm-artista').value.trim();
+  const tom     = document.getElementById('nm-tom').value;
+  const bpm     = document.getElementById('nm-bpm').value;
+  const spotify = document.getElementById('nm-spotify').value.trim();
+  const youtube = document.getElementById('nm-youtube').value.trim();
+  const cifra   = document.getElementById('nm-cifra').value.trim();
+  const pasta   = document.getElementById('nm-pasta').value;
+
+  let newId;
+  if (supabase && MIN_ID) {
+    const { data: row, error } = await supabase.from('musicas').insert({
+      ministerio_id: MIN_ID, titulo, artista, tom,
+      bpm: bpm ? parseInt(bpm) : null,
+      link_spotify: spotify, link_youtube: youtube, link_cifra: cifra,
+      pasta, criado_por: ME.id
+    }).select().single();
+    if (!error && row) newId = row.id;
+  }
+  if (!newId) newId = Math.max(0,...DB.get('musicas',[]).map(m=>m.id))+1;
+
   const musicas = DB.get('musicas',[]);
-  const newId = Math.max(0,...musicas.map(m=>m.id))+1;
-  musicas.push({
-    id: newId,
-    titulo,
-    artista: document.getElementById('nm-artista').value.trim(),
-    tom:     document.getElementById('nm-tom').value,
-    bpm:     document.getElementById('nm-bpm').value,
-    spotify: document.getElementById('nm-spotify').value.trim(),
-    youtube: document.getElementById('nm-youtube').value.trim(),
-    cifra:   document.getElementById('nm-cifra').value.trim(),
-    pasta:   document.getElementById('nm-pasta').value,
-  });
+  musicas.push({ id: newId, titulo, artista, tom, bpm, spotify, youtube, cifra, pasta });
   DB.set('musicas', musicas);
   closeModal('modal-musica');
   renderMusicas();
@@ -2919,16 +2961,25 @@ function renderAvisos() {
   `).join('') || '<div class="empty-state"><div class="ei">🔔</div><h3>Nenhum aviso</h3></div>';
 }
 
-function saveAviso() {
+async function saveAviso() {
   const titulo = document.getElementById('nav-titulo').value.trim();
   const msg    = document.getElementById('nav-msg').value.trim();
   if (!titulo || !msg) { toast('⚠️ Preencha título e mensagem'); return; }
+  const tipo = document.getElementById('nav-tipo').value;
+  const now  = new Date();
+
+  let newId;
+  if (supabase && MIN_ID) {
+    const { data: row, error } = await supabase.from('avisos').insert({
+      ministerio_id: MIN_ID, titulo, mensagem: msg, tipo, autor_id: ME.id
+    }).select().single();
+    if (!error && row) newId = row.id;
+  }
+  if (!newId) newId = Math.max(0,...DB.get('avisos',[]).map(a=>a.id))+1;
+
   const avisos = DB.get('avisos',[]);
-  const newId = Math.max(0,...avisos.map(a=>a.id))+1;
-  const now = new Date();
   avisos.unshift({
-    id: newId, titulo, msg,
-    tipo: document.getElementById('nav-tipo').value,
+    id: newId, titulo, msg, tipo,
     por: ME.nome,
     quando: now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
   });
@@ -3122,22 +3173,28 @@ function dispChangeMonth(d) {
   renderDisponibilidade();
 }
 
-function dispToggleDay(dateStr) {
+async function dispToggleDay(dateStr) {
   const membros = DB.get('membros', []);
-  const me = membros.find(x => x.id === ME.id);
+  const me = membros.find(x => String(x.id) === String(ME.id));
   if (!me) { toast('⚠️ Seu perfil não foi encontrado'); return; }
   if (!me.indisps) me.indisps = [];
   const existingIdx = me.indisps.findIndex(i => dateStr >= i.inicio && dateStr <= i.fim);
   if (existingIdx >= 0) {
     const ex = me.indisps[existingIdx];
-    if (ex.inicio === ex.fim) {
-      me.indisps.splice(existingIdx, 1);
-    } else {
-      me.indisps.splice(existingIdx, 1);
-      toast('ℹ️ Período removido. Use + Declarar período para novos intervalos.');
-    }
+    const removedId = ex.id;
+    me.indisps.splice(existingIdx, 1);
+    if (ex.inicio !== ex.fim) toast('ℹ️ Período removido. Use + Declarar período para novos intervalos.');
+    if (supabase) supabase.from('indisponibilidades').delete().eq('id', removedId).then(({error}) => { if (error) console.error('dispToggle delete:', error); });
   } else {
-    const newId = Math.max(0, ...(me.indisps.map(i => i.id))) + 1;
+    let newId = Date.now();
+    if (supabase && MIN_ID) {
+      const { data: row, error } = await supabase.from('indisponibilidades').insert({
+        membro_id: ME.id, ministerio_id: MIN_ID,
+        data_inicio: dateStr, data_fim: dateStr,
+        tipo: 'outro', motivo: ''
+      }).select().single();
+      if (!error && row) newId = row.id;
+    }
     me.indisps.push({ id: newId, inicio: dateStr, fim: dateStr, tipo: 'Indisponível', motivo: '' });
   }
   me.status = me.indisps.length ? 'indisponivel' : 'ativo';
@@ -3145,13 +3202,14 @@ function dispToggleDay(dateStr) {
   renderDisponibilidade();
 }
 
-function removeIndispMe(iId) {
+async function removeIndispMe(iId) {
   const membros = DB.get('membros', []);
-  const me = membros.find(x => x.id === ME.id);
+  const me = membros.find(x => String(x.id) === String(ME.id));
   if (!me) return;
   me.indisps = (me.indisps || []).filter(i => i.id !== iId);
   me.status = me.indisps.length ? 'indisponivel' : 'ativo';
   DB.set('membros', membros);
+  if (supabase) supabase.from('indisponibilidades').delete().eq('id', iId).then(({error}) => { if (error) console.error('removeIndispMe:', error); });
   renderDisponibilidade();
   toast('✅ Indisponibilidade removida');
 }
@@ -3441,7 +3499,7 @@ function openNovoMembro() {
 /* ================================================================
    HELPERS
 ================================================================ */
-function createEscala() {
+async function createEscala() {
   let titulo = document.getElementById('ne-titulo').value;
   let hora   = document.getElementById('ne-hora').value;
   const data = document.getElementById('ne-data').value;
@@ -3455,15 +3513,43 @@ function createEscala() {
 
   if (!titulo || !data) { toast('⚠️ Selecione uma data no calendário'); return; }
 
-  const escalas = DB.get('escalas',[]);
-  const newId = Math.max(0,...escalas.map(e=>e.id))+1;
+  const status = document.getElementById('ne-status').value;
+  const obs    = document.getElementById('ne-obs').value.trim();
   const emptySlot = pos => ({ pos, nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', tipo:'', escolhidoPor:null });
   const funcoes = DB.get('ministerio_funcoes', FUNCOES_LISTA);
+
+  let newId;
+
+  if (supabase && MIN_ID) {
+    try {
+      const { data: row, error } = await supabase.from('escalas').insert({
+        ministerio_id: MIN_ID,
+        titulo,
+        data_evento: data,
+        hora_evento: hora || '09:00',
+        status,
+        observacoes: obs,
+        criado_por: ME.id
+      }).select().single();
+      if (error) throw error;
+      newId = row.id;
+      // Insert 5 empty slots
+      await supabase.from('escala_slots').insert(
+        [1,2,3,4,5].map(pos => ({ escala_id: newId, posicao: pos }))
+      );
+    } catch(err) {
+      console.error('Erro ao criar escala no Supabase:', err);
+      toast('⚠️ Erro ao salvar no servidor. Salvando localmente.');
+      newId = Math.max(0,...DB.get('escalas',[]).map(e=>e.id))+1;
+    }
+  } else {
+    newId = Math.max(0,...DB.get('escalas',[]).map(e=>e.id))+1;
+  }
+
+  const escalas = DB.get('escalas',[]);
   escalas.push({
     id: newId, titulo, data, hora,
-    status: document.getElementById('ne-status').value,
-    obs: document.getElementById('ne-obs').value.trim(),
-    playlist: '',
+    status, obs, playlist: '',
     membros: [],
     cadeiras: funcoes.map(f => ({ funcao: f, membroId: null })),
     oferta: { nome:'', artista:'', tom:'', bpm:'', spotify:'', youtube:'', cifra:'', escolhidoPor:null },
@@ -3478,22 +3564,35 @@ function createEscala() {
   toast('✅ Escala criada! Preencha as cadeiras 🪑');
 }
 
-function saveMembro() {
+async function saveMembro() {
   const nome = document.getElementById('nm2-nome').value.trim();
   if (!nome) { toast('⚠️ Digite o nome'); return; }
   const funcoes = [...document.querySelectorAll('#nm2-funcoes input:checked')].map(c=>c.value);
   if (!funcoes.length) { toast('⚠️ Selecione ao menos uma função'); return; }
-  const membros = DB.get('membros',[]);
-  const newId = Math.max(0,...membros.map(m=>m.id))+1;
-  const avs = ['av1','av2','av3','av4','av5','av6'];
+  const email = document.getElementById('nm2-email').value.trim();
+  const tel   = document.getElementById('nm2-tel').value.trim();
+  const perm  = document.getElementById('nm2-perm').value;
+  const avs   = ['av1','av2','av3','av4','av5','av6'];
   const iniciais = nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
+
+  let newId;
+  if (supabase && MIN_ID) {
+    const av = avs[Math.floor(Math.random() * avs.length)];
+    const { data: row, error } = await supabase.from('membros').insert({
+      ministerio_id: MIN_ID, nome, email,
+      funcao: funcoes[0], permissao: perm,
+      avatar_cor: av
+    }).select().single();
+    if (!error && row) newId = row.id;
+  }
+  if (!newId) newId = Math.max(0,...DB.get('membros',[]).map(m=>m.id))+1;
+
+  const membros = DB.get('membros',[]);
   membros.push({
     id: newId, nome, iniciais,
-    av: avs[newId % avs.length],
-    funcoes,
-    email:  document.getElementById('nm2-email').value.trim(),
-    tel:    document.getElementById('nm2-tel').value.trim(),
-    perm:   document.getElementById('nm2-perm').value,
+    av: avs[membros.length % avs.length],
+    funcoes, funcao: funcoes[0],
+    email, tel, perm,
     status:'ativo', indisps:[]
   });
   DB.set('membros', membros);
@@ -3534,11 +3633,12 @@ function addMembroEscala(memId) {
   toast('✅ Membro adicionado à escala');
 }
 
-function publishEscala() {
+async function publishEscala() {
   const escalas = DB.get('escalas',[]);
   const e = escalas.find(x=>x.id===currentEscalaId);
   e.status = 'publicada';
   DB.set('escalas', escalas);
+  if (supabase) supabase.from('escalas').update({ status: 'publicada' }).eq('id', currentEscalaId).then(({error}) => { if (error) console.error('Erro ao publicar escala:', error); });
   // Notify all members in this escala
   const membros = DB.get('membros',[]);
   (e.membros||[]).forEach(me => notificarMembroEscalado(e, me.id, membros));
@@ -4402,14 +4502,22 @@ async function syncFromSupabase(membro) {
       if (min) { MIN_NOME = min.nome || ''; MIN_CODIGO = min.codigo || ''; }
     }
 
-    // Membros
-    const { data: membros } = await supabase.from('membros').select('*').eq('ministerio_id', minId);
+    MIN_ID = minId;
+
+    // Membros + Indisponibilidades (em paralelo)
+    const [{ data: membros }, { data: indisps }] = await Promise.all([
+      supabase.from('membros').select('*').eq('ministerio_id', minId),
+      supabase.from('indisponibilidades').select('*').eq('ministerio_id', minId)
+    ]);
     if (membros) {
-      const cachedMembros = DB.get('membros', []);
+      const indispsMap = {};
+      (indisps || []).forEach(i => {
+        if (!indispsMap[i.membro_id]) indispsMap[i.membro_id] = [];
+        indispsMap[i.membro_id].push({ id: i.id, inicio: i.data_inicio, fim: i.data_fim, tipo: i.tipo || 'outro', motivo: i.motivo || '' });
+      });
       DB.set('membros', membros.map(m => {
         const adapted = adaptMembro(m);
-        const cached = cachedMembros.find(c => c.id === m.id);
-        if (cached?.indisps?.length) adapted.indisps = cached.indisps;
+        adapted.indisps = indispsMap[m.id] || [];
         return adapted;
       }));
       // Atualiza ME com dados reais do usuário
