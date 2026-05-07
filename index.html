@@ -3911,9 +3911,8 @@ async function afterLogin(session) {
         hideLogin();
         navigate('dashboard');
       } else {
-        // Sem ministério: mostra login para criar ou entrar com código
-        showLogin();
-        toast('👋 Bem-vindo! Crie seu ministério ou entre com um código de convite.', 4000);
+        // Sem ministério: mostra tela de setup (mantém sessão ativa)
+        mostrarSetup();
       }
     }
   } catch(e) {
@@ -3939,6 +3938,67 @@ async function fazerLogout() {
   localStorage.clear();
   if (supabase) await supabase.auth.signOut().catch(() => {});
   location.reload();
+}
+
+function mostrarSetup() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+  // Pré-preenche nome do membro com dados do Google se disponível
+  if (supabase) {
+    supabase.auth.getUser().then(({ data }) => {
+      const nome = data?.user?.user_metadata?.full_name || data?.user?.user_metadata?.name || '';
+      if (nome) document.getElementById('setup-mem-nome').value = nome;
+    });
+  }
+}
+
+function esconderSetup() {
+  document.getElementById('setup-screen').style.display = 'none';
+}
+
+async function criarMinisterioAutenticado() {
+  const minNome = document.getElementById('setup-min-nome').value.trim();
+  const memNome = document.getElementById('setup-mem-nome').value.trim();
+  if (!minNome || !memNome) { toast('⚠️ Preencha o nome do ministério e o seu nome'); return; }
+  const btn = document.querySelector('#setup-screen button[onclick="criarMinisterioAutenticado()"]');
+  btn.textContent = 'Criando...'; btn.disabled = true;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: result, error } = await supabase.rpc('criar_ministerio_com_admin', {
+      p_nome_ministerio: minNome,
+      p_nome_membro: memNome,
+      p_email: user.email
+    });
+    if (error) throw error;
+    toast(`✅ Ministério criado! Código: ${result.codigo}`);
+    esconderSetup();
+    const { data: { session } } = await supabase.auth.getSession();
+    await afterLogin(session);
+  } catch(e) {
+    btn.textContent = '🚀 Criar ministério e entrar'; btn.disabled = false;
+    toast('❌ ' + e.message);
+  }
+}
+
+async function entrarComCodigoSetup() {
+  const codigo = document.getElementById('setup-codigo').value.trim().toUpperCase();
+  if (!codigo) { toast('⚠️ Digite o código'); return; }
+  try {
+    const { data, error } = await supabase.rpc('buscar_ministerio_por_codigo', { p_codigo: codigo });
+    if (error || !data?.length) throw new Error('Código inválido');
+    localStorage.setItem('_reg_ministerio_id', data[0].id);
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('membros').insert({
+      user_id: user.id, ministerio_id: data[0].id,
+      nome: document.getElementById('setup-mem-nome').value.trim() || user.user_metadata?.full_name || 'Membro',
+      email: user.email, funcao: '🎤 Vocal', permissao: 'participante', avatar_cor: 'av1'
+    });
+    localStorage.removeItem('_reg_ministerio_id');
+    esconderSetup();
+    const { data: { session } } = await supabase.auth.getSession();
+    await afterLogin(session);
+  } catch(e) { toast('❌ ' + e.message); }
 }
 
 // ---- Sincroniza dados do Supabase para o cache local ----
@@ -4180,6 +4240,39 @@ init();
 <!-- ================================================================
      TELA DE LOGIN (só aparece quando Supabase está configurado)
 ================================================================ -->
+<!-- Overlay: usuário autenticado mas sem ministério -->
+<div id="setup-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:1001;align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:420px;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-size:48px;margin-bottom:8px;">🎵</div>
+      <h2 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--accent2);margin-bottom:6px;">Bem-vindo ao EscalaWorship!</h2>
+      <p style="font-size:13px;color:var(--muted);">Você está logado. Agora crie seu ministério ou entre com um código de convite.</p>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:var(--accent2);margin-bottom:14px;">✨ Criar meu ministério</div>
+      <div class="form-group">
+        <label class="form-label">Nome do Ministério</label>
+        <input class="form-input" id="setup-min-nome" placeholder="Ex: Resgate Music">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Seu nome no ministério</label>
+        <input class="form-input" id="setup-mem-nome" placeholder="Ex: Udson Brum">
+      </div>
+      <button class="btn btn-primary" style="width:100%;" onclick="criarMinisterioAutenticado()">🚀 Criar ministério e entrar</button>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;">
+      <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:14px;">🔗 Entrar com código de convite</div>
+      <div style="display:flex;gap:8px;">
+        <input class="form-input" id="setup-codigo" placeholder="Código do ministério" style="flex:1;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+        <button class="btn btn-ghost" onclick="entrarComCodigoSetup()">Entrar</button>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:16px;">
+      <button onclick="fazerLogout()" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;">↩️ Sair e trocar de conta</button>
+    </div>
+  </div>
+</div>
+
 <div id="login-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:1000;align-items:center;justify-content:center;padding:20px;">
   <div style="width:100%;max-width:400px;">
     <!-- Logo -->
