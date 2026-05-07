@@ -4930,10 +4930,25 @@ async function init() {
   const hasSupa = await initSupabase();
 
   if (hasSupa) {
+    let _loginHandled = false;
+
+    // Registra onAuthStateChange ANTES de getSession para não perder o SIGNED_IN
+    // do callback OAuth (Spotify/Google) — que pode chegar depois do getSession()
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') { showPasswordResetForm(); return; }
+      if (event === 'SIGNED_OUT') { _loginHandled = false; showLogin(); return; }
+      if (session && !_loginHandled) {
+        _loginHandled = true;
+        await afterLogin(session);
+      }
+    });
+
+    // getSession() como caminho rápido (sessão já em cache/localStorage)
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
+    if (session && !_loginHandled) {
+      _loginHandled = true;
       await afterLogin(session);
-    } else {
+    } else if (!session && !_loginHandled) {
       showLogin();
       // Pré-preenche código de convite se veio pela URL
       const ic = localStorage.getItem('_invite_code');
@@ -4942,12 +4957,6 @@ async function init() {
         if (el) { el.value = ic; localStorage.removeItem('_invite_code'); }
       }
     }
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') { showPasswordResetForm(); return; }
-      if (session && document.getElementById('login-screen').style.display !== 'none') {
-        await afterLogin(session);
-      }
-    });
   } else {
     seedData();
     navigate('dashboard');
