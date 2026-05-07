@@ -2746,11 +2746,11 @@ function calDayClick(d) {
 /* ================================================================
    CALENDÁRIO — Nova Escala
 ================================================================ */
-let calMonth = new Date(); // first day of displayed month
+let novaEscalaDate = new Date(); // data exibida no modal de nova escala
 
 function abrirCalendarioEscala() {
-  calMonth = new Date();
-  calMonth.setDate(1);
+  novaEscalaDate = new Date();
+  novaEscalaDate.setDate(1);
   showCalStep(1);
   renderCalendario();
   openModal('modal-escala');
@@ -2762,14 +2762,14 @@ function showCalStep(n) {
   document.getElementById('cal-step3').style.display = n === 3 ? '' : 'none';
 }
 
-function calPrevMes() { calMonth.setMonth(calMonth.getMonth() - 1); renderCalendario(); }
-function calNextMes() { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendario(); }
+function calPrevMes() { novaEscalaDate.setMonth(novaEscalaDate.getMonth() - 1); renderCalendario(); }
+function calNextMes() { novaEscalaDate.setMonth(novaEscalaDate.getMonth() + 1); renderCalendario(); }
 
 function renderCalendario() {
   const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const cultos = DB.get('cultos_regulares', []);
-  const ano = calMonth.getFullYear();
-  const mes = calMonth.getMonth();
+  const ano = novaEscalaDate.getFullYear();
+  const mes = novaEscalaDate.getMonth();
   document.getElementById('cal-mes-label').textContent = `${MESES[mes]} ${ano}`;
 
   const primeiroDia = new Date(ano, mes, 1).getDay(); // 0=Dom
