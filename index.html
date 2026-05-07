@@ -1234,6 +1234,12 @@ body {
           <button class="btn btn-ghost btn-sm" onclick="openModal('modal-add-culto')" style="margin-bottom:20px;">+ Adicionar culto</button>
 
           <button class="btn btn-primary" onclick="toast('✅ Salvo!')">Salvar alterações</button>
+
+          <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
+            <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Zona de risco</div>
+            <button class="btn btn-ghost btn-sm" style="border-color:rgba(248,113,113,0.3);color:var(--red);" onclick="limparCacheLocal()">🗑️ Limpar cache local</button>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px;">Remove os dados temporários do browser e recarrega do servidor. Útil se os dados aparecerem desatualizados.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -3168,6 +3174,13 @@ const TODAS_FUNCOES = [
   '🎺 Trompete','🎷 Saxofone','🎻 Violino','🪗 Acordeon',
   '🔊 Som / Técnico','📹 Transmissão','💡 Iluminação','🎙️ Ministro','🎹 Órgão'
 ];
+
+function limparCacheLocal() {
+  if (!confirm('Limpar o cache local e recarregar os dados do servidor?\nIsso não apaga nada do banco de dados.')) return;
+  localStorage.clear();
+  toast('🔄 Cache limpo. Recarregando...');
+  setTimeout(() => location.reload(), 1000);
+}
 
 function renderMinisterio() {
   renderCultosRegulares();
