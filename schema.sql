@@ -403,6 +403,66 @@ create policy "ver chat" on chat_mensagens for select using (ministerio_id = meu
 create policy "membro envia mensagem" on chat_mensagens for insert with check (ministerio_id = meu_ministerio_id());
 
 -- ============================================================
+-- FUNÇÃO: buscar ministério por código de convite (sem autenticação)
+-- Necessária para o fluxo "Entrar com código de convite"
+-- ============================================================
+create or replace function buscar_ministerio_por_codigo(p_codigo text)
+returns table(id uuid, nome text, tipo text)
+language sql security definer as $$
+  select id, nome, tipo from ministerios where codigo = upper(p_codigo) limit 1;
+$$;
+
+-- ============================================================
+-- FUNÇÃO: criar ministério + admin em uma única transação
+-- Usada no fluxo "Criar meu ministério" da tela de login
+-- ============================================================
+create or replace function criar_ministerio_com_admin(
+  p_nome_ministerio text,
+  p_nome_membro     text,
+  p_email           text
+) returns json language plpgsql security definer as $$
+declare
+  v_codigo text;
+  v_min_id uuid;
+  v_mem_id uuid;
+begin
+  -- Garante que o usuário ainda não está vinculado a nenhum ministério
+  if exists(select 1 from membros where user_id = auth.uid()) then
+    raise exception 'Usuário já possui um ministério vinculado';
+  end if;
+  -- Código único (tenta até 5 vezes para evitar colisão)
+  for i in 1..5 loop
+    v_codigo := gerar_codigo_ministerio();
+    exit when not exists(select 1 from ministerios where codigo = v_codigo);
+  end loop;
+  -- Cria ministério
+  insert into ministerios(nome, tipo, codigo)
+    values(p_nome_ministerio, 'Louvor', v_codigo)
+    returning id into v_min_id;
+  -- Cria membro admin
+  insert into membros(user_id, ministerio_id, nome, email, funcao, permissao, avatar_cor)
+    values(auth.uid(), v_min_id, p_nome_membro, p_email, '🎤 Vocal', 'admin', 'av1')
+    returning id into v_mem_id;
+  return json_build_object(
+    'ministerio_id', v_min_id,
+    'membro_id',     v_mem_id,
+    'codigo',        v_codigo
+  );
+end;
+$$;
+
+-- ============================================================
+-- POLICY: permite que um usuário autenticado cadastre seu próprio membro
+-- Necessária para o fluxo de registro via código de convite
+-- (Se já existir, ignore o erro e prossiga)
+-- ============================================================
+do $$ begin
+  create policy "membro se auto-registra" on membros
+    for insert with check (user_id = auth.uid());
+exception when duplicate_object then null;
+end $$;
+
+-- ============================================================
 -- REALTIME: habilitar para tabelas de colaboração
 -- ============================================================
 -- Execute no Supabase: Database → Replication → habilitar as tabelas abaixo
