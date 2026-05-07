@@ -722,6 +722,8 @@ body {
 .aviso-card h4 { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
 .aviso-card p  { font-size: 12.5px; color: var(--text2); line-height: 1.5; }
 .aviso-card .av-meta { font-size: 10.5px; color: var(--muted); margin-top: 7px; }
+#view-escala-detail.is-past .edit-only { display: none !important; }
+.cal-day-past { opacity: 0.3; cursor: not-allowed !important; pointer-events: none; }
 
 /* ============================================================
    SECTION TITLE
@@ -977,8 +979,10 @@ body {
         <button class="btn btn-ghost btn-sm" onclick="navigate('escalas')">← Voltar</button>
         <h2 id="esc-detail-name" style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;flex:1;"></h2>
         <span id="esc-detail-info" class="tag tag-muted"></span>
+        <span id="esc-historico-badge"></span>
         <button class="btn btn-ghost btn-sm" id="esc-gcal-btn" onclick="adicionarEscalaGoogleAgenda()" title="Adicionar ao Google Agenda">📅</button>
-        <button class="btn btn-gold btn-sm" onclick="publishEscala()">📢 Publicar</button>
+        <span id="esc-delete-wrap"></span>
+        <button class="btn btn-gold btn-sm edit-only" onclick="publishEscala()">📢 Publicar</button>
       </div>
 
       <div class="grid2 mb20">
@@ -986,7 +990,7 @@ body {
         <div class="card">
           <div class="card-header">
             <h3>🪑 Cadeiras</h3>
-            <button class="btn btn-ghost btn-sm" onclick="abrirAddCadeira()">+ Cadeira</button>
+            <button class="btn btn-ghost btn-sm edit-only" onclick="abrirAddCadeira()">+ Cadeira</button>
           </div>
           <div class="card-body" id="esc-membros" style="padding:0 16px;"></div>
         </div>
@@ -1021,7 +1025,7 @@ body {
       <div class="card mb16" id="esc-playlist-card">
         <div class="card-header">
           <h3>🎧 Playlist do Dia</h3>
-          <button class="btn btn-ghost btn-xs" onclick="editPlaylist()">✏️ Editar</button>
+          <button class="btn btn-ghost btn-xs edit-only" onclick="editPlaylist()">✏️ Editar</button>
         </div>
         <div class="card-body" id="esc-playlist-wrap"></div>
       </div>
@@ -1041,12 +1045,12 @@ body {
           <!-- SETLIST -->
           <div id="tab-slots">
             <div id="slots-list"></div>
-            <button class="btn btn-ghost btn-sm" onclick="addSlot()" style="margin-top:8px;">+ Adicionar posição</button>
+            <button class="btn btn-ghost btn-sm edit-only" onclick="addSlot()" style="margin-top:8px;">+ Adicionar posição</button>
           </div>
 
           <!-- SUGESTÕES -->
           <div id="tab-sugestoes" style="display:none;">
-            <div style="margin-bottom:14px;padding:12px;background:rgba(240,192,64,0.07);border:1px solid rgba(240,192,64,0.2);border-radius:var(--r-sm);">
+            <div class="edit-only" style="margin-bottom:14px;padding:12px;background:rgba(240,192,64,0.07);border:1px solid rgba(240,192,64,0.2);border-radius:var(--r-sm);">
               <div style="font-size:12.5px;font-weight:600;margin-bottom:8px;color:var(--gold);">💡 Sugerir uma música</div>
               <div class="form-row" style="margin-bottom:8px;">
                 <input class="form-input" id="sug-name" placeholder="Nome ou link da música">
@@ -1816,6 +1820,7 @@ function seedData() {
    STATE
 ================================================================ */
 let currentEscalaId = null;
+let escalaIsPast = false;
 let editingSlotPos   = null;
 let editingMembroId  = null;
 let calYear = 2026, calMonth = 4;
@@ -2170,6 +2175,23 @@ function renderEscalaDetail(id) {
   if (!e) return;
   currentEscalaId = id;
 
+  const hoje = new Date().toISOString().split('T')[0];
+  escalaIsPast = e.data < hoje;
+
+  // Toggle modo leitura
+  document.getElementById('view-escala-detail').classList.toggle('is-past', escalaIsPast);
+
+  // Badge de histórico
+  document.getElementById('esc-historico-badge').innerHTML = escalaIsPast
+    ? '<span class="tag tag-muted" style="font-size:11px;">🔒 Histórico</span>' : '';
+
+  // Botão excluir (líder, dentro de 7 dias do evento)
+  const seteAtras = new Date(); seteAtras.setDate(seteAtras.getDate() - 7);
+  const seteStr = seteAtras.toISOString().split('T')[0];
+  const canDelete = ME.perm === 'admin' && e.data >= seteStr;
+  document.getElementById('esc-delete-wrap').innerHTML = canDelete
+    ? `<button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="excluirEscala('${e.id}')">🗑️ Excluir</button>` : '';
+
   document.getElementById('esc-detail-name').textContent = e.titulo;
   document.getElementById('esc-detail-data').textContent = formatDate(e.data);
   document.getElementById('esc-detail-hora').textContent = e.hora;
@@ -2245,14 +2267,25 @@ function renderCadeiras() {
             <div style="font-size:10px;color:var(--muted);font-weight:600;line-height:1.2;">${c.funcao}</div>
             <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.nome}${indisp?'<span style="font-size:10px;color:var(--red);margin-left:5px;">🚫 Indisp.</span>':''}</div>
           </div>
-          <select onchange="changeConfirmCadeira(${idx},this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:3px 5px;font-size:11px;cursor:pointer;flex-shrink:0;">
-            <option value="pendente"   ${me?.confirm==='pendente'  ?'selected':''}>⏳</option>
-            <option value="confirmado" ${me?.confirm==='confirmado'?'selected':''}>✓</option>
-            <option value="recusado"   ${me?.confirm==='recusado'  ?'selected':''}>✗</option>
-          </select>
-          <div class="icon-btn" onclick="removerDaCadeira(${idx})" title="Liberar cadeira" style="flex-shrink:0;">✕</div>
+          ${escalaIsPast
+            ? confirmPill(me?.confirm || 'pendente')
+            : `<select onchange="changeConfirmCadeira(${idx},this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:3px 5px;font-size:11px;cursor:pointer;flex-shrink:0;">
+                <option value="pendente"   ${me?.confirm==='pendente'  ?'selected':''}>⏳</option>
+                <option value="confirmado" ${me?.confirm==='confirmado'?'selected':''}>✓</option>
+                <option value="recusado"   ${me?.confirm==='recusado'  ?'selected':''}>✗</option>
+               </select>
+               <div class="icon-btn" onclick="removerDaCadeira(${idx})" title="Liberar cadeira" style="flex-shrink:0;">✕</div>`}
         </div>`;
       } else {
+        if (escalaIsPast) {
+          return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">
+            <div style="width:34px;height:34px;border-radius:50%;border:2px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;color:var(--muted);opacity:0.4;">🪑</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:10px;color:var(--muted);font-weight:600;line-height:1.2;">${c.funcao}</div>
+              <div style="font-size:12px;color:var(--muted);font-style:italic;">— vazio —</div>
+            </div>
+          </div>`;
+        }
         return `<div onclick="abrirCadeiraPicker(${idx})" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer;border-radius:4px;transition:background 0.15s;"
           onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
           <div style="width:34px;height:34px;border-radius:50%;border:2px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;color:var(--muted);">🪑</div>
@@ -2264,7 +2297,7 @@ function renderCadeiras() {
         </div>`;
       }
     }).join('') +
-    `<button onclick="abrirAddCadeira()" style="width:100%;margin-top:10px;margin-bottom:4px;padding:8px;background:transparent;border:1px dashed var(--border2);border-radius:var(--r-sm);color:var(--muted);font-size:12px;cursor:pointer;">+ Adicionar cadeira extra</button>`;
+    (escalaIsPast ? '' : `<button onclick="abrirAddCadeira()" style="width:100%;margin-top:10px;margin-bottom:4px;padding:8px;background:transparent;border:1px dashed var(--border2);border-radius:var(--r-sm);color:var(--muted);font-size:12px;cursor:pointer;">+ Adicionar cadeira extra</button>`);
 }
 
 function renderConfirmSummary() {
@@ -2465,12 +2498,14 @@ function renderSlots() {
   const santaCeia = isFirstSunday(e.data);
 
   // Repertório principal
+  const editBtn = (pos) => escalaIsPast ? '' : `<button class="btn btn-ghost btn-xs" onclick="openEditSlot(${typeof pos === 'string' ? `'${pos}'` : pos})">✏️ Editar</button>`;
+
   const slotsHtml = slots.map(s => `
     <div class="slot-wrap" id="slot-${s.pos}">
       <div class="slot-header">
         <div class="slot-num">${s.pos}</div>
         <div class="slot-title">Posição ${s.pos}</div>
-        <button class="btn btn-ghost btn-xs" onclick="openEditSlot(${s.pos})">✏️ Editar</button>
+        ${editBtn(s.pos)}
       </div>
       ${slotMusicHtml(s, s.pos)}
     </div>`).join('');
@@ -2481,7 +2516,7 @@ function renderSlots() {
       <div class="slot-header">
         <div class="slot-num slot-special">💰</div>
         <div class="slot-title">Oferta</div>
-        <button class="btn btn-ghost btn-xs" onclick="openEditSlot('oferta')">✏️ Editar</button>
+        ${editBtn('oferta')}
       </div>
       ${slotMusicHtml(oferta, 'oferta')}
     </div>`;
@@ -2492,7 +2527,7 @@ function renderSlots() {
       <div class="slot-header">
         <div class="slot-num slot-special">✝️</div>
         <div class="slot-title">Santa Ceia</div>
-        <button class="btn btn-ghost btn-xs" onclick="openEditSlot('santa-ceia')">✏️ Editar</button>
+        ${editBtn('santa-ceia')}
       </div>
       ${slotMusicHtml(e.santaCeia||{nome:'',artista:'',tom:'',bpm:'',spotify:'',youtube:'',cifra:''}, 'santa-ceia')}
     </div>` : '';
@@ -3441,11 +3476,21 @@ function renderCalendario() {
   let html = '';
   for (let i = 0; i < primeiroDia; i++) html += '<div></div>';
 
+  const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
+
   for (let d = 1; d <= diasNoMes; d++) {
     const diaSemana = new Date(ano, mes, d).getDay();
     const dataStr = `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const cultosDia = cultos.filter(c => c.dia === diaSemana);
     const isHoje = (d === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear());
+    const isPast = dataStr < hojeStr;
+
+    if (isPast) {
+      html += `<div class="cal-day-past" style="text-align:center;padding:6px 2px;border-radius:8px;border:1px solid var(--border);min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
+        <div style="font-size:13px;color:var(--muted);text-decoration:line-through;">${d}</div>
+      </div>`;
+      continue;
+    }
 
     const cor = cultosDia.length === 1 ? cultosDia[0].cor
               : cultosDia.length > 1   ? 'var(--accent)'
@@ -3796,6 +3841,17 @@ function addMembroEscala(memId) {
   closeModal('modal-add-membro-escala');
   renderEscalaDetail(currentEscalaId);
   toast('✅ Membro adicionado à escala');
+}
+
+async function excluirEscala(id) {
+  if (!confirm('Excluir esta escala? Esta ação não pode ser desfeita.')) return;
+  if (supabase) {
+    const { error } = await supabase.from('escalas').delete().eq('id', id);
+    if (error) { toast('❌ Erro ao excluir: ' + error.message); return; }
+  }
+  DB.set('escalas', DB.get('escalas', []).filter(e => String(e.id) !== String(id)));
+  navigate('escalas');
+  toast('🗑️ Escala excluída');
 }
 
 async function publishEscala() {
