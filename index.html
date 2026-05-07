@@ -844,6 +844,9 @@ body {
   <div class="nav-item" data-nav="agenda" onclick="navigate('agenda')">
     <span class="ni">📅</span> Agenda
   </div>
+  <div class="nav-item" data-nav="disponibilidade" onclick="navigate('disponibilidade')">
+    <span class="ni">🚫</span> Disponibilidade
+  </div>
 
   <div class="nav-label">Ministério</div>
   <div class="nav-item" data-nav="membros" onclick="navigate('membros')">
@@ -1123,12 +1126,50 @@ body {
             <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Sincronize suas escalas com o calendário</div>
             <button class="btn btn-ghost btn-sm" onclick="syncGoogle()" style="width:100%;">Conectar conta Google</button>
           </div>
+          <!-- Spotify connect -->
+          <div style="background:rgba(29,185,84,0.07);border:1px solid rgba(29,185,84,0.2);border-radius:var(--r);padding:14px;text-align:center;margin-top:12px;">
+            <div style="font-size:22px;margin-bottom:6px;">🎵</div>
+            <div style="font-weight:600;font-size:13px;margin-bottom:3px;">Spotify</div>
+            <div id="sp-connect-status" style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Conecte para buscar músicas e importar playlists</div>
+            <button id="sp-connect-btn" class="btn btn-sm" onclick="toggleSpotifyConnect()" style="width:100%;background:#1DB954;color:#fff;border:none;font-weight:600;">Conectar Spotify</button>
+          </div>
         </div>
 
         <div>
           <div class="card">
             <div class="card-header"><h3>📋 Eventos do Mês</h3></div>
             <div class="card-body" id="cal-events"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== DISPONIBILIDADE ==================== -->
+    <div class="view" id="view-disponibilidade">
+      <div class="grid2">
+        <div>
+          <div class="card mb16">
+            <div class="card-header">
+              <button class="btn btn-ghost btn-sm" onclick="dispChangeMonth(-1)">◀</button>
+              <h3 id="disp-title" style="flex:1;text-align:center;"></h3>
+              <button class="btn btn-ghost btn-sm" onclick="dispChangeMonth(1)">▶</button>
+            </div>
+            <div class="card-body">
+              <div class="cal-grid mb16" id="disp-headers"></div>
+              <div class="cal-grid" id="disp-days"></div>
+              <div style="display:flex;gap:16px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);">
+                <div style="display:flex;align-items:center;gap:5px;"><div style="width:12px;height:12px;border-radius:3px;background:rgba(248,113,113,0.2);border:1px solid var(--red);"></div> Indisponível</div>
+                <div style="display:flex;align-items:center;gap:5px;"><div style="width:12px;height:12px;border-radius:3px;background:rgba(201,167,106,0.18);border:1px solid rgba(201,167,106,0.4);"></div> Evento</div>
+              </div>
+              <p style="font-size:11.5px;color:var(--muted);margin-top:10px;">Toque em um dia para marcar/desmarcar como indisponível.</p>
+            </div>
+          </div>
+          <button class="btn btn-danger" style="width:100%;" onclick="abrirIndispPropria()">+ Declarar período</button>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-header"><h3>🚫 Minhas Indisponibilidades</h3></div>
+            <div class="card-body" id="disp-list"></div>
           </div>
         </div>
       </div>
@@ -1767,8 +1808,9 @@ const NAV_CFG = {
   musicas:        { title:'Repertório',   action:'+ Adicionar Música', modal:'modal-musica' },
   avisos:         { title:'Avisos',       action:'+ Novo Aviso',    modal:'modal-aviso' },
   chat:           { title:'Chat',         action:null },
-  agenda:         { title:'Agenda',       action:null },
-  relatorios:     { title:'Relatórios',   action:null },
+  agenda:           { title:'Agenda',         action:null },
+  disponibilidade:  { title:'Disponibilidade', action:null },
+  relatorios:       { title:'Relatórios',      action:null },
   ministerio:     { title:'Ministério',   action:null },
 };
 
@@ -1800,8 +1842,9 @@ function navigate(page, extra) {
   if (page === 'musicas')        renderMusicas();
   if (page === 'avisos')         renderAvisos();
   if (page === 'chat')           renderChat();
-  if (page === 'agenda')         renderCalendar();
-  if (page === 'ministerio')     renderMinisterio();
+  if (page === 'agenda')          { renderCalendar(); updateSpotifyCard(); }
+  if (page === 'disponibilidade') renderDisponibilidade();
+  if (page === 'ministerio')      renderMinisterio();
 }
 
 function handleMainAction() {
@@ -2547,7 +2590,8 @@ function saveIndisp() {
   m.status = 'indisponivel';
   DB.set('membros', membros);
   closeModal('modal-indisp');
-  renderMembroDetail(editingMembroId);
+  if (editingMembroId === ME.id) renderDisponibilidade();
+  else renderMembroDetail(editingMembroId);
   toast('🚫 Indisponibilidade declarada');
 }
 
@@ -2809,6 +2853,140 @@ function calDayClick(d) {
   const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   const esc = escalas.find(e=>e.data===dateStr);
   if (esc) openEscala(esc.id);
+}
+
+/* ================================================================
+   CALENDÁRIO — Disponibilidade própria
+================================================================ */
+let dispYear = new Date().getFullYear(), dispMonth = new Date().getMonth();
+
+function renderDisponibilidade() {
+  document.getElementById('disp-title').textContent = MONTH_NAMES[dispMonth] + ' ' + dispYear;
+  document.getElementById('disp-headers').innerHTML = DAY_NAMES.map(d => `<div class="cal-dh">${d}</div>`).join('');
+
+  const firstDay = new Date(dispYear, dispMonth, 1).getDay();
+  const daysInMonth = new Date(dispYear, dispMonth + 1, 0).getDate();
+  const today = new Date();
+  const escalas = DB.get('escalas', []);
+  const meData = DB.get('membros', []).find(m => m.id === ME.id);
+
+  const eventDays = new Set(
+    escalas.filter(e => {
+      const d = new Date(e.data + 'T00:00:00');
+      return d.getFullYear() === dispYear && d.getMonth() === dispMonth;
+    }).map(e => new Date(e.data + 'T00:00:00').getDate())
+  );
+
+  let html = Array(firstDay).fill('<div class="cal-day empty"></div>').join('');
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${dispYear}-${String(dispMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const isToday = dispYear === today.getFullYear() && dispMonth === today.getMonth() && d === today.getDate();
+    const indisp = meData ? isIndisponivel(meData, dateStr) : false;
+    const hasEvent = eventDays.has(d);
+    let cls = 'cal-day';
+    if (isToday) cls += ' today';
+    if (hasEvent) cls += ' has-event';
+    if (indisp) cls += ' unavailable';
+    const tip = indisp ? 'Remover indisponibilidade' : 'Marcar como indisponível';
+    html += `<div class="${cls}" onclick="dispToggleDay('${dateStr}')" title="${tip}">${d}</div>`;
+  }
+  document.getElementById('disp-days').innerHTML = html;
+
+  const indisps = (meData?.indisps || []).slice().sort((a, b) => a.inicio.localeCompare(b.inicio));
+  document.getElementById('disp-list').innerHTML = indisps.length
+    ? indisps.map(i => `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+          <div style="font-size:20px;">🚫</div>
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:13px;">${formatDate(i.inicio)}${i.inicio !== i.fim ? ' → ' + formatDate(i.fim) : ''}</div>
+            <div style="font-size:11.5px;color:var(--muted);">${i.motivo || i.tipo || 'Indisponível'}</div>
+          </div>
+          <button class="btn btn-danger btn-xs" onclick="removeIndispMe(${i.id})">✕</button>
+        </div>`).join('')
+    : '<div class="empty-state" style="padding:20px;"><div class="ei">✅</div><p>Nenhuma indisponibilidade</p></div>';
+}
+
+function dispChangeMonth(d) {
+  dispMonth += d;
+  if (dispMonth > 11) { dispMonth = 0; dispYear++; }
+  if (dispMonth < 0)  { dispMonth = 11; dispYear--; }
+  renderDisponibilidade();
+}
+
+function dispToggleDay(dateStr) {
+  const membros = DB.get('membros', []);
+  const me = membros.find(x => x.id === ME.id);
+  if (!me) { toast('⚠️ Seu perfil não foi encontrado'); return; }
+  if (!me.indisps) me.indisps = [];
+  const existingIdx = me.indisps.findIndex(i => dateStr >= i.inicio && dateStr <= i.fim);
+  if (existingIdx >= 0) {
+    const ex = me.indisps[existingIdx];
+    if (ex.inicio === ex.fim) {
+      me.indisps.splice(existingIdx, 1);
+    } else {
+      me.indisps.splice(existingIdx, 1);
+      toast('ℹ️ Período removido. Use + Declarar período para novos intervalos.');
+    }
+  } else {
+    const newId = Math.max(0, ...(me.indisps.map(i => i.id))) + 1;
+    me.indisps.push({ id: newId, inicio: dateStr, fim: dateStr, tipo: 'Indisponível', motivo: '' });
+  }
+  me.status = me.indisps.length ? 'indisponivel' : 'ativo';
+  DB.set('membros', membros);
+  renderDisponibilidade();
+}
+
+function removeIndispMe(iId) {
+  const membros = DB.get('membros', []);
+  const me = membros.find(x => x.id === ME.id);
+  if (!me) return;
+  me.indisps = (me.indisps || []).filter(i => i.id !== iId);
+  me.status = me.indisps.length ? 'indisponivel' : 'ativo';
+  DB.set('membros', membros);
+  renderDisponibilidade();
+  toast('✅ Indisponibilidade removida');
+}
+
+function abrirIndispPropria() {
+  editingMembroId = ME.id;
+  document.getElementById('ind-inicio').value = '';
+  document.getElementById('ind-fim').value = '';
+  document.getElementById('ind-tipo').value = 'Indisponível';
+  document.getElementById('ind-motivo').value = '';
+  openModal('modal-indisp');
+}
+
+function toggleSpotifyConnect() {
+  if (spotifyToken) {
+    spotifyToken = null;
+    localStorage.removeItem('_sp_token');
+    localStorage.removeItem('_sp_exp');
+    updateSpotifyCard();
+    toast('🎵 Spotify desconectado');
+  } else {
+    conectarSpotifyParaBusca();
+  }
+}
+
+function updateSpotifyCard() {
+  const btn = document.getElementById('sp-connect-btn');
+  const status = document.getElementById('sp-connect-status');
+  if (!btn || !status) return;
+  if (spotifyToken) {
+    btn.textContent = 'Desconectar Spotify';
+    btn.style.background = 'transparent';
+    btn.style.color = 'var(--red)';
+    btn.style.border = '1px solid rgba(248,113,113,0.4)';
+    status.innerHTML = '✅ Conectado — busca e importação ativas';
+    status.style.color = 'var(--green)';
+  } else {
+    btn.textContent = 'Conectar Spotify';
+    btn.style.background = '#1DB954';
+    btn.style.color = '#fff';
+    btn.style.border = 'none';
+    status.textContent = 'Conecte para buscar músicas e importar playlists';
+    status.style.color = '';
+  }
 }
 
 /* ================================================================
