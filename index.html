@@ -952,11 +952,10 @@ body {
         <div style="font-size:26px;">📅</div>
         <div style="flex:1;">
           <div style="font-weight:700;font-size:14px;">Google Agenda</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Exporte todas as escalas ou adicione cada uma individualmente</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Use 📅 em cada escala para adicionar ao Google Agenda, ou exporte todas de uma vez</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn btn-ghost btn-sm gcal-btn" onclick="conectarGoogleAgenda()">Conectar Google Agenda</button>
-          <button class="btn btn-ghost btn-sm" onclick="exportarIcal()" title="Exportar arquivo .ics">⬇️ .ics</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportarIcal()" title="Exportar todas como .ics e importar no Google Agenda">⬇️ Exportar todas (.ics)</button>
         </div>
       </div>
     </div>
@@ -1152,8 +1151,7 @@ body {
           <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.18);border-radius:var(--r);padding:14px;text-align:center;">
             <div style="font-size:22px;margin-bottom:6px;">📅</div>
             <div style="font-weight:600;font-size:13px;margin-bottom:3px;">Google Agenda</div>
-            <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Exporte todas as escalas ou adicione individualmente em cada escala</div>
-            <button class="btn btn-ghost btn-sm gcal-btn" onclick="conectarGoogleAgenda()" style="width:100%;margin-bottom:6px;">Conectar Google Agenda</button>
+            <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">Use o botão 📅 em cada escala para adicionar direto ao Google Agenda, ou exporte todas de uma vez</div>
             <button class="btn btn-ghost btn-sm" onclick="exportarIcal()" style="width:100%;">⬇️ Exportar todas (.ics)</button>
           </div>
           <!-- Spotify connect -->
@@ -3642,8 +3640,6 @@ async function publishEscala() {
   // Notify all members in this escala
   const membros = DB.get('membros',[]);
   (e.membros||[]).forEach(me => notificarMembroEscalado(e, me.id, membros));
-  // Sincroniza com Google Agenda se conectado
-  criarEventoGoogleCal(e);
   renderEscalaDetail(currentEscalaId);
   toast('📢 Escala publicada! Membros notificados.');
 }
@@ -3706,19 +3702,14 @@ function escalaDateBadge(data, size) {
   return `<div class="escala-date"><div class="eday">${day}</div><div class="emon">${mon}</div></div>`;
 }
 
-function syncGoogle() { conectarGoogleAgenda(); }
+function syncGoogle() { exportarIcal(); }
 
 async function conectarGoogleAgenda() {
+  toast('ℹ️ Use o botão 📅 em cada escala para adicionar ao Google Agenda, ou ⬇️ para exportar todas.');
+}
+
+async function _conectarGoogleAgenda_legacy() {
   if (!supabase) { toast('⚠️ Sistema offline'); return; }
-  if (googleCalToken) {
-    if (confirm('Google Agenda já conectado. Desconectar?')) {
-      googleCalToken = null;
-      localStorage.removeItem('_gcal_token');
-      atualizarBotaoGcal();
-      toast('Google Agenda desconectado');
-    }
-    return;
-  }
   localStorage.setItem('_gcal_connecting', '1');
   toast('🔐 Abrindo autorização do Google...');
   await supabase.auth.signInWithOAuth({
@@ -4316,14 +4307,6 @@ async function afterLogin(session) {
   if (!session || !supabase) {
     hideLogin(); seedData(); navigate('dashboard'); return;
   }
-  // Captura token Google Agenda se veio de um OAuth de calendário
-  if (session.provider_token && localStorage.getItem('_gcal_connecting')) {
-    localStorage.removeItem('_gcal_connecting');
-    googleCalToken = session.provider_token;
-    localStorage.setItem('_gcal_token', session.provider_token);
-    atualizarBotaoGcal();
-    toast('✅ Google Agenda conectado! Escalas publicadas serão sincronizadas automaticamente.');
-  }
   try {
     // Cria ministério pendente (quando o usuário confirmou email após preencher o formulário)
     const newMinNome = localStorage.getItem('_new_min_nome');
@@ -4704,8 +4687,6 @@ async function init() {
   const spToken = localStorage.getItem('_sp_token');
   const spExp   = localStorage.getItem('_sp_exp');
   if (spToken && spExp && Date.now() < parseInt(spExp)) spotifyToken = spToken;
-  const gcToken = localStorage.getItem('_gcal_token');
-  if (gcToken) googleCalToken = gcToken;
 
   // 3. Código de convite na URL (?invite=CODIGO)
   const inviteCode = urlParams.get('invite');
