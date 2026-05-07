@@ -1843,7 +1843,7 @@ function navigate(page, extra) {
   closeSidebar();
 
   // Render views
-  if (page === 'dashboard')      renderDashboard();
+  if (page === 'dashboard')      { atualizarSidebar(); renderDashboard(); }
   if (page === 'escalas')        renderEscalas();
   if (page === 'escala-detail')  renderEscalaDetail(extra);
   if (page === 'membros')        renderMembros();
@@ -1927,7 +1927,7 @@ function renderDashboard() {
 
   // Badges sidebar
   const minhasPendentes = ME.id
-    ? escalas.filter(e => e.data >= hoje && e.membros.some(m => String(m.id) === String(ME.id) && m.confirm === 'pendente')).length
+    ? escalas.filter(e => e.data >= hoje && (e.membros || []).some(m => String(m.id) === String(ME.id) && m.confirm === 'pendente')).length
     : 0;
   const badgeEsc = document.getElementById('badge-escalas');
   if (badgeEsc) { badgeEsc.textContent = minhasPendentes; badgeEsc.style.display = minhasPendentes ? '' : 'none'; }
@@ -1942,7 +1942,7 @@ function renderDashboard() {
       ${escalaDateBadge(e.data, 'small')}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.titulo}</div>
-        <div style="font-size:11px;color:var(--muted);">${e.hora || ''} • ${e.membros.length} membros</div>
+        <div style="font-size:11px;color:var(--muted);">${e.hora || ''} • ${(e.membros || []).length} membros</div>
       </div>
       ${statusTag(e.status)}
     </div>
@@ -1977,7 +1977,7 @@ function renderDashboard() {
   const dashMinhas = document.getElementById('dash-minhas-escalas');
   if (cardMinhas && ME.id) {
     const minhasEscalas = escalas
-      .filter(e => e.data >= hoje && e.membros.some(m => String(m.id) === String(ME.id)))
+      .filter(e => e.data >= hoje && (e.membros || []).some(m => String(m.id) === String(ME.id)))
       .sort((a, b) => a.data.localeCompare(b.data));
     if (minhasEscalas.length) {
       cardMinhas.style.display = '';
@@ -2020,8 +2020,9 @@ function renderRelatorios() {
 
   let totalAlocados = 0, totalConf = 0;
   escalas.forEach(e => {
-    totalAlocados += e.membros.length;
-    totalConf += e.membros.filter(m => m.confirm === 'confirmado').length;
+    const mems = e.membros || [];
+    totalAlocados += mems.length;
+    totalConf += mems.filter(m => m.confirm === 'confirmado').length;
   });
   const taxa = totalAlocados ? Math.round((totalConf / totalAlocados) * 100) + '%' : '—';
 
@@ -2032,7 +2033,7 @@ function renderRelatorios() {
 
   // Top membros mais escalados
   const memCount = {};
-  escalas.forEach(e => e.membros.forEach(me => { memCount[me.id] = (memCount[me.id] || 0) + 1; }));
+  escalas.forEach(e => (e.membros || []).forEach(me => { memCount[me.id] = (memCount[me.id] || 0) + 1; }));
   const topMembros = Object.entries(memCount)
     .sort((a, b) => b[1] - a[1]).slice(0, 5)
     .map(([id, count]) => {
@@ -2860,7 +2861,7 @@ function renderAvisos() {
 
   // Minhas escalas pendentes de confirmação
   const minhasEscalas = ME.id
-    ? escalas.filter(e => e.data >= hoje && e.membros.some(m => String(m.id) === String(ME.id)))
+    ? escalas.filter(e => e.data >= hoje && (e.membros || []).some(m => String(m.id) === String(ME.id)))
         .sort((a, b) => a.data.localeCompare(b.data))
     : [];
 
@@ -4187,15 +4188,17 @@ async function criarMinisterioAutenticado() {
 }
 
 async function entrarComCodigoSetup() {
-  const codigo = document.getElementById('setup-codigo').value.trim().toUpperCase();
-  if (!codigo) { toast('⚠️ Digite o código'); return; }
+  if (!supabase) { toast('⚠️ Sistema offline'); return; }
+  const codigo     = document.getElementById('setup-codigo').value.trim().toUpperCase();
+  const nomeInput  = document.getElementById('setup-join-nome').value.trim();
+  const funcoesSel = [...document.querySelectorAll('#setup-join-funcoes input:checked')].map(c => c.value);
+
+  if (!codigo)          { toast('⚠️ Digite o código de convite'); return; }
+  if (!nomeInput)       { toast('⚠️ Digite seu nome'); return; }
+  if (!funcoesSel.length) { toast('⚠️ Selecione ao menos uma função'); return; }
 
   const { data: { user } } = await supabase.auth.getUser();
-  const nome = (document.getElementById('setup-join-nome').value.trim()
-    || user.user_metadata?.full_name || 'Membro');
-  const funcoesSel = [...document.querySelectorAll('#setup-join-funcoes input:checked')].map(c => c.value);
-  if (!nome) { toast('⚠️ Digite seu nome'); return; }
-  if (!funcoesSel.length) { toast('⚠️ Selecione ao menos uma função'); return; }
+  const nome = nomeInput || user.user_metadata?.full_name || 'Membro';
 
   try {
     const { data, error } = await supabase.rpc('buscar_ministerio_por_codigo', { p_codigo: codigo });
@@ -4230,6 +4233,11 @@ async function syncFromSupabase(membro) {
     if (membro.ministerios) {
       MIN_CODIGO = membro.ministerios.codigo || '';
       MIN_NOME   = membro.ministerios.nome   || '';
+    }
+    // Fallback: busca ministério separado se o join não trouxe dados
+    if (!MIN_NOME && minId) {
+      const { data: min } = await supabase.from('ministerios').select('nome, codigo').eq('id', minId).single();
+      if (min) { MIN_NOME = min.nome || ''; MIN_CODIGO = min.codigo || ''; }
     }
 
     // Membros
