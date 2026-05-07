@@ -2118,7 +2118,7 @@ function renderEscalas(filter='todas') {
     const day = String(d.getDate()).padStart(2,'0');
     const mon = d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','').toUpperCase();
     const conf = e.membros.filter(m=>m.confirm==='confirmado').length;
-    return `<div class="escala-card" onclick="openEscala('${e.id}')">`
+    return `<div class="escala-card" onclick="openEscala('${e.id}')">
       <div class="escala-date"><div class="eday">${day}</div><div class="emon">${mon}</div></div>
       <div class="escala-info">
         <h4>${e.titulo}</h4>
@@ -3116,7 +3116,7 @@ function renderCalendar() {
         const euEscalado = ME.id && (e.membros||[]).some(m => String(m.id)===String(ME.id));
         const meObj = euEscalado ? (e.membros||[]).find(m => String(m.id)===String(ME.id)) : null;
         return `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:10px;margin-bottom:7px;cursor:pointer;border:1px solid ${euEscalado?'rgba(201,167,106,0.4)':'var(--border)'};" onclick="openEscala('${e.id}')">`
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:10px;margin-bottom:7px;cursor:pointer;border:1px solid ${euEscalado?'rgba(201,167,106,0.4)':'var(--border)'};" onclick="openEscala('${e.id}')">
           ${escalaDateBadge(e.data,'small')}
           <div style="flex:1;">
             <div style="font-weight:600;font-size:13px;">${e.titulo}</div>
