@@ -2818,6 +2818,7 @@ function saveMusica() {
 async function importarPlaylistSpotify() {
   if (!spotifyToken) {
     toast('⚠️ Conecte o Spotify primeiro.');
+    localStorage.setItem('_sp_import_intent', '1');
     conectarSpotifyParaBusca();
     return;
   }
@@ -3855,9 +3856,21 @@ async function _trocarSpotifyCode(code) {
       localStorage.setItem('_sp_token', d.access_token);
       localStorage.setItem('_sp_exp', Date.now() + (d.expires_in - 60) * 1000);
       localStorage.removeItem('_sp_v');
-      toast('✅ Spotify conectado! Já pode buscar músicas.');
+      updateSpotifyCard();
+      toast('✅ Spotify conectado!');
+      // Se usuário tentou importar playlist antes de conectar, retoma automaticamente
+      if (localStorage.getItem('_sp_import_intent')) {
+        localStorage.removeItem('_sp_import_intent');
+        setTimeout(() => { navigate('musicas'); importarPlaylistSpotify(); }, 600);
+      }
+    } else {
+      toast('❌ Erro Spotify: ' + (d.error_description || d.error || 'Tente reconectar'));
+      console.warn('Spotify token error:', d);
     }
-  } catch(e) { console.warn('Spotify token exchange:', e); }
+  } catch(e) {
+    toast('❌ Falha ao conectar Spotify. Verifique a conexão.');
+    console.warn('Spotify token exchange:', e);
+  }
 }
 
 async function initSupabase() {
@@ -4392,7 +4405,13 @@ async function syncFromSupabase(membro) {
     // Membros
     const { data: membros } = await supabase.from('membros').select('*').eq('ministerio_id', minId);
     if (membros) {
-      DB.set('membros', membros.map(adaptMembro));
+      const cachedMembros = DB.get('membros', []);
+      DB.set('membros', membros.map(m => {
+        const adapted = adaptMembro(m);
+        const cached = cachedMembros.find(c => c.id === m.id);
+        if (cached?.indisps?.length) adapted.indisps = cached.indisps;
+        return adapted;
+      }));
       // Atualiza ME com dados reais do usuário
       const meReal = membros.find(m => m.user_id === membro.user_id);
       if (meReal) {
