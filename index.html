@@ -1563,6 +1563,16 @@ body {
         <label class="form-label">Tipo</label>
         <select class="form-select" id="nav-tipo"><option value="geral">📋 Geral</option><option value="urgente">⚠️ Urgente</option><option value="info">ℹ️ Informação</option></select>
       </div>
+      <div class="form-group">
+        <label class="form-label">Duração</label>
+        <select class="form-select" id="nav-periodicidade">
+          <option value="temporario">🕐 Temporário (some após ler)</option>
+          <option value="confirmacao">✅ Por confirmação (requer confirmação de leitura)</option>
+          <option value="semanal">📅 Semanal (reaparece toda semana)</option>
+          <option value="mensal">📆 Mensal (reaparece todo mês)</option>
+          <option value="permanente">📌 Permanente (não pode ser descartado)</option>
+        </select>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-aviso')">Cancelar</button>
@@ -1946,9 +1956,10 @@ function renderDashboard() {
     : 0;
   const badgeEsc = document.getElementById('badge-escalas');
   if (badgeEsc) { badgeEsc.textContent = minhasPendentes; badgeEsc.style.display = minhasPendentes ? '' : 'none'; }
-  const avisosGerais = avisos.filter(a => !a.membroId);
+  const lidosBadge = DB.get('aviso_lidos', []);
+  const avisosNaoLidos = avisos.filter(a => !a.membroId && isAvisoVisivel(a, lidosBadge));
   const badgeAv = document.getElementById('badge-avisos');
-  if (badgeAv) { badgeAv.textContent = avisosGerais.length; badgeAv.style.display = avisosGerais.length ? '' : 'none'; }
+  if (badgeAv) { badgeAv.textContent = avisosNaoLidos.length; badgeAv.style.display = avisosNaoLidos.length ? '' : 'none'; }
 
   // Próximas escalas
   const proximas = escalas.filter(e => e.data >= hoje).slice(0, 3);
@@ -1979,13 +1990,13 @@ function renderDashboard() {
     dashConf.innerHTML = '<div class="empty-state" style="padding:20px;"><p>Nenhum membro escalado ainda</p></div>';
   }
 
-  // Avisos
-  document.getElementById('dash-avisos').innerHTML = avisosGerais.slice(0, 2).map(a => `
+  // Avisos (dashboard preview — mostra apenas não-lidos)
+  document.getElementById('dash-avisos').innerHTML = avisosNaoLidos.slice(0, 2).map(a => `
     <div class="aviso-card ${a.tipo === 'urgente' ? 'urg' : a.tipo === 'info' ? 'info' : ''}">
       <h4>${a.titulo}</h4><p>${a.msg}</p>
       <div class="av-meta">Por ${a.por} • ${a.quando}</div>
     </div>
-  `).join('') || '<div class="empty-state" style="padding:16px;"><p>Nenhum aviso</p></div>';
+  `).join('') || '<div class="empty-state" style="padding:16px;"><p>Nenhum aviso novo</p></div>';
 
   // Minhas escalas (para o membro logado) — inclui passadas se ainda não confirmei
   const cardMinhas = document.getElementById('card-minhas-escalas');
@@ -2995,27 +3006,48 @@ function renderAvisos() {
     containerMinhas.innerHTML = '';
   }
 
-  // Avisos gerais (sem membroId = para todos)
-  const avisosGerais = avisos.filter(a => !a.membroId);
-  document.getElementById('avisos-list').innerHTML = avisosGerais.map(a => `
+  // Avisos gerais
+  const lidos = DB.get('aviso_lidos', []);
+  const avisosGerais = avisos.filter(a => !a.membroId && isAvisoVisivel(a, lidos));
+  const isLider = ME.perm === 'admin';
+
+  const periodLabel = { temporario:'🕐 Temporário', confirmacao:'✅ Por confirmação', semanal:'📅 Semanal', mensal:'📆 Mensal', permanente:'📌 Permanente' };
+
+  document.getElementById('avisos-list').innerHTML = avisosGerais.map(a => {
+    const isAutor   = String(a.autorId) === String(ME.id);
+    const canDelete = isAutor || isLider;
+    // Botão "Li" só para temporario/confirmacao (semanal/mensal expiram sozinhos; permanente não some)
+    const naoLido   = a.periodicidade === 'temporario' || a.periodicidade === 'confirmacao';
+    return `
     <div class="aviso-card ${a.tipo === 'urgente' ? 'urg' : a.tipo === 'info' ? 'info' : ''}">
-      <h4>${a.titulo}</h4><p>${a.msg}</p>
-      <div class="av-meta">Por ${a.por} • ${a.quando}</div>
-    </div>
-  `).join('') || '<div class="empty-state"><div class="ei">🔔</div><h3>Nenhum aviso</h3></div>';
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <h4 style="margin:0;">${a.titulo}</h4>
+        ${canDelete ? `<button onclick="deletarAviso('${a.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px;padding:0;flex-shrink:0;" title="Excluir aviso">🗑️</button>` : ''}
+      </div>
+      <p>${a.msg}</p>
+      <div class="av-meta" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Por ${a.por} • ${a.quando}</span>
+        <span style="font-size:10px;opacity:0.7;">${periodLabel[a.periodicidade] || ''}</span>
+      </div>
+      ${naoLido ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+        <button class="btn btn-ghost btn-sm" style="color:var(--green);" onclick="confirmarLeituraAviso('${a.id}')">✓ ${a.periodicidade === 'confirmacao' ? 'Confirmar leitura' : 'Marcar como lido'}</button>
+      </div>` : ''}
+    </div>`
+  }).join('') || '<div class="empty-state"><div class="ei">🔔</div><h3>Nenhum aviso</h3></div>';
 }
 
 async function saveAviso() {
   const titulo = document.getElementById('nav-titulo').value.trim();
   const msg    = document.getElementById('nav-msg').value.trim();
   if (!titulo || !msg) { toast('⚠️ Preencha título e mensagem'); return; }
-  const tipo = document.getElementById('nav-tipo').value;
+  const tipo          = document.getElementById('nav-tipo').value;
+  const periodicidade = document.getElementById('nav-periodicidade').value;
   const now  = new Date();
 
   let newId;
   if (supabase && MIN_ID) {
     const { data: row, error } = await supabase.from('avisos').insert({
-      ministerio_id: MIN_ID, titulo, mensagem: msg, tipo, autor_id: ME.id
+      ministerio_id: MIN_ID, titulo, mensagem: msg, tipo, periodicidade, autor_id: ME.id
     }).select().single();
     if (!error && row) newId = row.id;
   }
@@ -3023,7 +3055,8 @@ async function saveAviso() {
 
   const avisos = DB.get('avisos',[]);
   avisos.unshift({
-    id: newId, titulo, msg, tipo,
+    id: newId, titulo, msg, tipo, periodicidade, autorId: ME.id,
+    criadoEm: now.toISOString(),
     por: ME.nome,
     quando: now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
   });
@@ -3031,6 +3064,54 @@ async function saveAviso() {
   closeModal('modal-aviso');
   renderAvisos();
   toast('🔔 Aviso enviado!');
+}
+
+// Verifica se aviso está visível (considera periodicidade e leitura individual)
+function isAvisoVisivel(aviso, lidos) {
+  // Semanal/Mensal: expiram automaticamente pela data de criação (para todos)
+  if (aviso.periodicidade === 'semanal' && aviso.criadoEm) {
+    const diffDias = (Date.now() - new Date(aviso.criadoEm)) / 86400000;
+    if (diffDias >= 7) return false;
+  }
+  if (aviso.periodicidade === 'mensal' && aviso.criadoEm) {
+    const diffDias = (Date.now() - new Date(aviso.criadoEm)) / 86400000;
+    if (diffDias >= 30) return false;
+  }
+  // Permanente: sempre visível
+  if (aviso.periodicidade === 'permanente') return true;
+  // Temporário/Confirmação: some quando o membro descarta
+  const lido = lidos.find(l => String(l.avisoId) === String(aviso.id));
+  return !lido || !lido.descartado;
+}
+
+// Marca aviso como lido/descartado (somente temporario e confirmacao)
+async function confirmarLeituraAviso(id) {
+  const avisos = DB.get('avisos', []);
+  const aviso  = avisos.find(a => String(a.id) === String(id));
+  if (!aviso) return;
+  const descartado = true; // só chama esse botão para temporario/confirmacao
+  const lidos = DB.get('aviso_lidos', []);
+  const idx   = lidos.findIndex(l => String(l.avisoId) === String(id));
+  const agora = new Date().toISOString();
+  if (idx >= 0) { lidos[idx].lidoEm = agora; lidos[idx].descartado = descartado; }
+  else          { lidos.push({ avisoId: id, lidoEm: agora, descartado }); }
+  DB.set('aviso_lidos', lidos);
+  if (supabase && ME.id) {
+    await supabase.from('aviso_lidos').upsert({ aviso_id: id, membro_id: ME.id, lido_em: agora, descartado }, { onConflict: 'aviso_id,membro_id' });
+  }
+  renderAvisos();
+  toast(descartado ? '✓ Aviso descartado' : '✓ Leitura confirmada');
+}
+
+// Deleta aviso permanentemente (autor ou líder) — remove para todos
+async function deletarAviso(id) {
+  if (supabase) {
+    const { error } = await supabase.from('avisos').delete().eq('id', id);
+    if (error) { toast('❌ Erro ao excluir: ' + error.message); return; }
+  }
+  DB.set('avisos', DB.get('avisos', []).filter(a => String(a.id) !== String(id)));
+  renderAvisos();
+  toast('🗑️ Aviso excluído');
 }
 
 /* ================================================================
@@ -4598,6 +4679,10 @@ async function syncFromSupabase(membro) {
     const { data: avisos } = await supabase.from('avisos').select('*, membros!autor_id(nome)').eq('ministerio_id', minId).order('criado_em', {ascending: false});
     if (avisos) DB.set('avisos', avisos.map(adaptAviso));
 
+    // Registros de leitura de avisos do membro atual
+    const { data: avisosLidos } = await supabase.from('aviso_lidos').select('*').eq('membro_id', membro.id);
+    if (avisosLidos) DB.set('aviso_lidos', avisosLidos.map(l => ({ avisoId: l.aviso_id, lidoEm: l.lido_em, descartado: l.descartado })));
+
     // Chat
     const { data: chat } = await supabase.from('chat_mensagens').select('*, membros!autor_id(id, nome, iniciais, avatar_cor)').eq('ministerio_id', minId).order('criado_em').limit(50);
     if (chat) DB.set('chat', chat.map(adaptChat));
@@ -4649,6 +4734,9 @@ function adaptMusica(m) {
 function adaptAviso(a) {
   const d = new Date(a.criado_em);
   return { id: a.id, titulo: a.titulo, msg: a.mensagem, tipo: a.tipo,
+    periodicidade: a.periodicidade || 'temporario',
+    autorId: a.autor_id,
+    criadoEm: a.criado_em,
     por: a.membros?.nome || 'Sistema',
     quando: d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) };
 }

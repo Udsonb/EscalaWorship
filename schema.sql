@@ -155,9 +155,21 @@ create table if not exists avisos (
   ministerio_id uuid references ministerios(id) on delete cascade,
   titulo        text not null,
   mensagem      text not null,
-  tipo          text default 'geral',  -- geral | urgente | info
+  tipo          text default 'geral',          -- geral | urgente | info
+  periodicidade text default 'temporario',     -- temporario | confirmacao | semanal | mensal | permanente
   autor_id      uuid references membros(id) on delete set null,
   criado_em     timestamptz default now()
+);
+
+-- ============================================================
+-- TABELA: aviso_lidos
+-- ============================================================
+create table if not exists aviso_lidos (
+  aviso_id      uuid references avisos(id) on delete cascade,
+  membro_id     uuid references membros(id) on delete cascade,
+  lido_em       timestamptz default now(),
+  descartado    boolean default false,
+  primary key (aviso_id, membro_id)
 );
 
 -- ============================================================
@@ -304,6 +316,7 @@ alter table escala_membros      enable row level security;
 alter table escala_slots        enable row level security;
 alter table sugestoes           enable row level security;
 alter table avisos              enable row level security;
+alter table aviso_lidos         enable row level security;
 alter table chat_mensagens      enable row level security;
 
 -- Helper: retorna o ministerio_id do usuário logado
@@ -399,6 +412,14 @@ create policy "admin decide sugestao" on sugestoes for update
 -- AVISOS e CHAT: todos do ministério
 create policy "ver avisos" on avisos for select using (ministerio_id = meu_ministerio_id());
 create policy "admin cria aviso" on avisos for insert with check (ministerio_id = meu_ministerio_id() and sou_admin());
+create policy "autor deleta aviso" on avisos for delete using (autor_id = meu_membro_id() and ministerio_id = meu_ministerio_id());
+create policy "admin deleta aviso" on avisos for delete using (sou_admin() and ministerio_id = meu_ministerio_id());
+-- AVISO_LIDOS: membro gerencia seus próprios registros de leitura
+create policy "ver proprios lidos" on aviso_lidos for select using (membro_id = meu_membro_id());
+create policy "marcar como lido" on aviso_lidos for insert with check (membro_id = meu_membro_id());
+create policy "atualizar lido" on aviso_lidos for update using (membro_id = meu_membro_id());
+create policy "remover lido" on aviso_lidos for delete using (membro_id = meu_membro_id());
+
 create policy "ver chat" on chat_mensagens for select using (ministerio_id = meu_ministerio_id());
 create policy "membro envia mensagem" on chat_mensagens for insert with check (ministerio_id = meu_ministerio_id());
 
