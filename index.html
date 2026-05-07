@@ -11,6 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <title>EscalaWorship</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ============================================================
    TOKENS & RESET
@@ -3194,7 +3195,7 @@ let spotifyToken = null;
 async function initSupabase() {
   if (!USE_SUPABASE) return false;
   try {
-    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+    const { createClient } = window.supabase;
     supabase = createClient(SUPA_URL, SUPA_KEY);
     return true;
   } catch(e) {
