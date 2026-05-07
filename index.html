@@ -1810,6 +1810,11 @@ const ME = { id:1, nome:'Ricardo Barbosa', iniciais:'RB', av:'av1' };
 let MIN_CODIGO = '';
 let MIN_NOME   = '';
 
+// URL base do app (funciona tanto no Netlify quanto no GitHub Pages /subpath/)
+function appBaseUrl() {
+  return location.origin + location.pathname.replace(/index\.html$/, '');
+}
+
 /* ================================================================
    NAVIGATION
 ================================================================ */
@@ -3392,7 +3397,7 @@ function syncGoogle() {
 
 function abrirConvite() {
   const codigo = MIN_CODIGO || 'SEMCOD';
-  const url = `${location.origin}?invite=${codigo}`;
+  const url = `${appBaseUrl()}?invite=${codigo}`;
   document.getElementById('inv-url').value = url;
   document.getElementById('inv-url-copy').onclick = () => copyText(url);
   const el = document.getElementById('inv-codigo');
@@ -3403,7 +3408,7 @@ function abrirConvite() {
 
 function shareWhatsApp() {
   const codigo = MIN_CODIGO || 'SEMCOD';
-  const url = encodeURIComponent(`${location.origin}?invite=${codigo}`);
+  const url = encodeURIComponent(`${appBaseUrl()}?invite=${codigo}`);
   const nomeMin = encodeURIComponent(MIN_NOME || 'nosso ministério');
   window.open(`https://wa.me/?text=Entre%20no%20${nomeMin}%20no%20EscalaWorship!%20${url}`, '_blank');
 }
@@ -3491,7 +3496,7 @@ async function conectarSpotifyParaBusca() {
   const params = new URLSearchParams({
     client_id: SPOTIFY_CLIENT_ID,
     response_type: 'code',
-    redirect_uri: location.origin,
+    redirect_uri: appBaseUrl(),
     scope: 'user-read-private playlist-read-private playlist-read-collaborative',
     code_challenge_method: 'S256',
     code_challenge: await _spChallenge(verifier),
@@ -3509,7 +3514,7 @@ async function _trocarSpotifyCode(code) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         client_id: SPOTIFY_CLIENT_ID, grant_type: 'authorization_code',
-        code, redirect_uri: location.origin, code_verifier: verifier
+        code, redirect_uri: appBaseUrl(), code_verifier: verifier
       })
     });
     const d = await res.json();
@@ -3552,7 +3557,7 @@ async function loginGoogle() {
   try {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin }
+      options: { redirectTo: appBaseUrl() }
     });
   } catch(e) { toast('❌ Erro no login: ' + e.message); }
 }
@@ -3562,7 +3567,7 @@ async function loginSpotify() {
   try {
     await supabase.auth.signInWithOAuth({
       provider: 'spotify',
-      options: { redirectTo: window.location.origin, scopes: 'user-read-email streaming' }
+      options: { redirectTo: appBaseUrl(), scopes: 'user-read-email streaming' }
     });
   } catch(e) { toast('❌ Erro no login Spotify: ' + e.message); }
 }
@@ -3595,7 +3600,7 @@ async function esqueceuSenha() {
   if (!supabase) return;
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin
+      redirectTo: appBaseUrl()
     });
     if (error) throw error;
     toast('📧 Link de redefinição enviado para ' + email);
@@ -3674,7 +3679,7 @@ async function registrarComCodigo() {
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email, password: senha,
-      options: { data: { nome }, emailRedirectTo: window.location.origin }
+      options: { data: { nome }, emailRedirectTo: appBaseUrl() }
     });
     if (authError) throw authError;
 
@@ -3823,7 +3828,7 @@ async function criarMeuMinisterio() {
   try {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email, password: senha,
-      options: { data: { nome }, emailRedirectTo: window.location.origin }
+      options: { data: { nome }, emailRedirectTo: appBaseUrl() }
     });
     if (authError) throw authError;
 
