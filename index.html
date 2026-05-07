@@ -4134,11 +4134,27 @@ function mostrarSetup() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-shell').style.display = 'none';
   document.getElementById('setup-screen').style.display = 'flex';
-  // Pré-preenche nome do membro com dados do Google se disponível
+
+  // Renderiza checkboxes de funções na seção de convite
+  const funcoes = DB.get('ministerio_funcoes', FUNCOES_LISTA);
+  const container = document.getElementById('setup-join-funcoes');
+  if (container) {
+    container.innerHTML = funcoes.map(f => `
+      <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:99px;padding:4px 10px;font-size:12px;">
+        <input type="checkbox" value="${f}" style="accent-color:var(--primary);"> ${f}
+      </label>`).join('');
+  }
+
+  // Pré-preenche nome com dados do Google
   if (supabase) {
     supabase.auth.getUser().then(({ data }) => {
       const nome = data?.user?.user_metadata?.full_name || data?.user?.user_metadata?.name || '';
-      if (nome) document.getElementById('setup-mem-nome').value = nome;
+      if (nome) {
+        const joinNome = document.getElementById('setup-join-nome');
+        const memNome  = document.getElementById('setup-mem-nome');
+        if (joinNome && !joinNome.value) joinNome.value = nome;
+        if (memNome  && !memNome.value)  memNome.value  = nome;
+      }
     });
   }
 }
@@ -4174,17 +4190,33 @@ async function criarMinisterioAutenticado() {
 async function entrarComCodigoSetup() {
   const codigo = document.getElementById('setup-codigo').value.trim().toUpperCase();
   if (!codigo) { toast('⚠️ Digite o código'); return; }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const nome = (document.getElementById('setup-join-nome').value.trim()
+    || user.user_metadata?.full_name || 'Membro');
+  const funcoesSel = [...document.querySelectorAll('#setup-join-funcoes input:checked')].map(c => c.value);
+  if (!nome) { toast('⚠️ Digite seu nome'); return; }
+  if (!funcoesSel.length) { toast('⚠️ Selecione ao menos uma função'); return; }
+
   try {
     const { data, error } = await supabase.rpc('buscar_ministerio_por_codigo', { p_codigo: codigo });
     if (error || !data?.length) throw new Error('Código inválido');
-    localStorage.setItem('_reg_ministerio_id', data[0].id);
-    const { data: { user } } = await supabase.auth.getUser();
+
+    const iniciais = nome.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+    const avs = ['av1','av2','av3','av4','av5','av6'];
+    const av  = avs[Math.floor(Math.random() * avs.length)];
+
     await supabase.from('membros').insert({
-      user_id: user.id, ministerio_id: data[0].id,
-      nome: document.getElementById('setup-mem-nome').value.trim() || user.user_metadata?.full_name || 'Membro',
-      email: user.email, funcao: '🎤 Vocal', permissao: 'participante', avatar_cor: 'av1'
+      user_id: user.id,
+      ministerio_id: data[0].id,
+      nome,
+      iniciais,
+      email: user.email,
+      funcao: funcoesSel[0],
+      permissao: 'participante',
+      avatar_cor: av,
     });
-    localStorage.removeItem('_reg_ministerio_id');
+
     esconderSetup();
     const { data: { session } } = await supabase.auth.getSession();
     await afterLogin(session);
@@ -4452,9 +4484,17 @@ init();
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;">
       <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:14px;">🔗 Entrar com código de convite</div>
-      <div style="display:flex;gap:8px;">
+      <div class="form-group">
+        <label class="form-label">Seu nome no ministério</label>
+        <input class="form-input" id="setup-join-nome" placeholder="Ex: Ana Paula">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Suas funções <span style="font-size:10px;color:var(--muted);">(selecione uma ou mais)</span></label>
+        <div id="setup-join-funcoes" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px;">
         <input class="form-input" id="setup-codigo" placeholder="Código do ministério" style="flex:1;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
-        <button class="btn btn-ghost" onclick="entrarComCodigoSetup()">Entrar</button>
+        <button class="btn btn-primary" onclick="entrarComCodigoSetup()">Entrar</button>
       </div>
     </div>
     <div style="text-align:center;margin-top:16px;">
