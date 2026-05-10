@@ -2352,20 +2352,40 @@ function abrirCadeiraPicker(idx) {
   const membros = DB.get('membros',[]);
   const candidatos = membros.filter(m => m.status !== 'inativo' && matchesCadeira(memberFuncoes(m), c.funcao));
 
+  const isVocalCadeira = n => normFuncao(n).includes('vocal');
+
   document.getElementById('modal-cadeira-list').innerHTML = candidatos.length
     ? candidatos.map(m => {
         const indisp = isIndisponivel(m, e.data);
-        const jaEmOutraCadeira = e.cadeiras.some((cc,i) => i !== idx && String(cc.membroId) === String(m.id));
-        return `<div class="member-row" style="${indisp?'background:rgba(248,113,113,0.06);':''}">
+        const outrasCadeiras = e.cadeiras.filter((cc,i) => i !== idx && String(cc.membroId) === String(m.id));
+        const jaEscalado = outrasCadeiras.length > 0;
+
+        // Conflito: dois instrumentos OU duas posições vocais
+        let conflito = false;
+        if (jaEscalado) {
+          const estaEmVocal = outrasCadeiras.some(cc => isVocalCadeira(cc.funcao));
+          const estaEmInstrumento = outrasCadeiras.some(cc => !isVocalCadeira(cc.funcao));
+          const cadeiraAtualEVocal = isVocalCadeira(c.funcao);
+          // Bloquear: vocal+vocal OU instrumento+instrumento
+          if (cadeiraAtualEVocal && estaEmVocal) conflito = true;
+          if (!cadeiraAtualEVocal && estaEmInstrumento) conflito = true;
+        }
+
+        const labelExtra = conflito
+          ? '<span style="font-size:10px;color:var(--red);margin-left:6px;">✕ conflito</span>'
+          : jaEscalado ? '<span style="font-size:10px;color:var(--accent);margin-left:6px;">✓ vocal+instrumento</span>' : '';
+
+        return `<div class="member-row" style="${indisp?'background:rgba(248,113,113,0.06);':''};${conflito?'opacity:.45;':''}">
           <div class="avatar ${m.av}" style="${indisp?'border:2px solid var(--red);':''}">${m.iniciais}</div>
           <div class="m-info" style="flex:1;">
-            <div class="name">${m.nome}${jaEmOutraCadeira?'<span style="font-size:10px;color:var(--gold);margin-left:6px;">⚠ já escalado</span>':''}</div>
+            <div class="name">${m.nome}${labelExtra}</div>
             <div class="role">${indisp?'🚫 Indisponível nesta data':'✅ Disponível'}</div>
           </div>
-          ${indisp
-            ? `<span class="tag tag-red" style="flex-shrink:0;">🚫 Indisp.</span>
-               <button class="btn btn-ghost btn-xs" style="flex-shrink:0;" onclick="atribuirMembroCadeira('${m.id}')">Escalar mesmo</button>`
-            : `<button class="btn btn-primary btn-xs" style="flex-shrink:0;" onclick="atribuirMembroCadeira('${m.id}')">Escalar</button>`}
+          ${conflito ? '<span class="tag tag-red" style="flex-shrink:0;">Conflito</span>'
+            : indisp
+              ? `<span class="tag tag-red" style="flex-shrink:0;">🚫 Indisp.</span>
+                 <button class="btn btn-ghost btn-xs" style="flex-shrink:0;" onclick="atribuirMembroCadeira('${m.id}')">Escalar mesmo</button>`
+              : `<button class="btn btn-primary btn-xs" style="flex-shrink:0;" onclick="atribuirMembroCadeira('${m.id}')">Escalar</button>`}
         </div>`;
       }).join('')
     : `<div class="empty-state"><p>Nenhum membro cadastrado toca ${c.funcao}</p></div>`;
@@ -2402,10 +2422,19 @@ async function atribuirMembroCadeira(memIdRaw) {
 
   DB.set('escalas', escalas);
   if (isNew) notificarMembroEscalado(e, memId, membros);
-  closeModal('modal-cadeira-picker');
   renderCadeiras();
   renderConfirmSummary();
-  toast('✅ Membro escalado!');
+
+  // Próxima cadeira vazia
+  const proxIdx = e.cadeiras.findIndex((cc, i) => i > currentCadeiraIdx && !cc.membroId);
+  if (proxIdx !== -1) {
+    closeModal('modal-cadeira-picker');
+    toast('✅ Escalado! Abrindo próxima cadeira...');
+    setTimeout(() => abrirCadeiraPicker(proxIdx), 300);
+  } else {
+    closeModal('modal-cadeira-picker');
+    toast('✅ Membro escalado!');
+  }
 }
 
 function removerDaCadeira(idx) {
@@ -3700,24 +3729,33 @@ function renderCultosRegulares() {
             <div style="font-size:13px;font-weight:600;">${c.nome}</div>
             <div style="font-size:11px;color:var(--muted);">${dias[c.dia]} • ${c.hora}</div>
           </div>
-          <button onclick="removeCultoRegular(${c.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;" title="Remover">×</button>
+          <button onclick="removeCultoRegular('${c.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;" title="Remover">×</button>
         </div>`
       ).join('')
     : '<div style="font-size:12px;color:var(--muted);font-style:italic;">Nenhum culto cadastrado ainda.</div>';
 }
 
-function salvarCultoRegular() {
+async function salvarCultoRegular() {
   const nome = document.getElementById('nc-nome').value.trim();
   if (!nome) { toast('⚠️ Digite o nome do culto'); return; }
+  const dia  = Number(document.getElementById('nc-dia').value);
+  const hora = document.getElementById('nc-hora').value;
+  const cor  = document.getElementById('nc-cor').value;
+
+  let newId;
+  if (supabase && MIN_ID) {
+    const { data, error } = await supabase.from('cultos_regulares')
+      .insert({ ministerio_id: MIN_ID, nome, dia_semana: dia, hora, cor })
+      .select().single();
+    if (error) { toast('❌ Erro ao salvar: ' + error.message); return; }
+    newId = data.id;
+  } else {
+    const cultos = DB.get('cultos_regulares', []);
+    newId = Math.max(0, ...cultos.map(c => typeof c.id === 'number' ? c.id : 0)) + 1;
+  }
+
   const cultos = DB.get('cultos_regulares', []);
-  const newId = Math.max(0, ...cultos.map(c=>c.id||0)) + 1;
-  cultos.push({
-    id: newId,
-    dia:  Number(document.getElementById('nc-dia').value),
-    hora: document.getElementById('nc-hora').value,
-    nome,
-    cor:  document.getElementById('nc-cor').value
-  });
+  cultos.push({ id: newId, dia, hora, nome, cor });
   DB.set('cultos_regulares', cultos);
   closeModal('modal-add-culto');
   document.getElementById('nc-nome').value = '';
@@ -3725,8 +3763,11 @@ function salvarCultoRegular() {
   toast('✅ Culto adicionado!');
 }
 
-function removeCultoRegular(id) {
-  const cultos = DB.get('cultos_regulares', []).filter(c => c.id !== id);
+async function removeCultoRegular(id) {
+  if (supabase && MIN_ID) {
+    await supabase.from('cultos_regulares').delete().eq('id', id);
+  }
+  const cultos = DB.get('cultos_regulares', []).filter(c => String(c.id) !== String(id));
   DB.set('cultos_regulares', cultos);
   renderCultosRegulares();
   toast('Culto removido');
@@ -3972,11 +4013,164 @@ async function publishEscala() {
   e.status = 'publicada';
   DB.set('escalas', escalas);
   if (supabase) supabase.from('escalas').update({ status: 'publicada' }).eq('id', currentEscalaId).then(({error}) => { if (error) console.error('Erro ao publicar escala:', error); });
-  // Notify all members in this escala
   const membros = DB.get('membros',[]);
   (e.membros||[]).forEach(me => notificarMembroEscalado(e, me.id, membros));
   renderEscalaDetail(currentEscalaId);
   toast('📢 Escala publicada! Membros notificados.');
+  sugerirProximaEscala(e);
+}
+
+function escalarAutomatico(escala) {
+  const membros = DB.get('membros', []).filter(m => m.status !== 'inativo');
+  const escalas = DB.get('escalas', []).filter(e => e.status === 'publicada');
+
+  // Conta quantas vezes cada membro foi escalado recentemente (últimas 8 escalas)
+  const recentes = escalas.slice(-8);
+  const contagem = {};
+  membros.forEach(m => { contagem[m.id] = 0; });
+  recentes.forEach(e => (e.membros || []).forEach(me => {
+    if (contagem[me.id] !== undefined) contagem[me.id]++;
+  }));
+
+  // Para cada cadeira, escolhe o membro disponível menos escalado que toca aquela função
+  // Sem repetir instrumento, mas permite vocal + instrumento
+  const usadosInstrumento = new Set();
+  const usadosVocal = new Set();
+  const isVocalCad = f => normFuncao(f).includes('vocal');
+
+  escala.cadeiras.forEach(c => {
+    if (c.membroId) return; // já preenchida
+    const candidatos = membros
+      .filter(m => matchesCadeira(memberFuncoes(m), c.funcao) && !isIndisponivel(m, escala.data))
+      .sort((a, b) => (contagem[a.id] || 0) - (contagem[b.id] || 0));
+
+    for (const m of candidatos) {
+      const id = String(m.id);
+      if (isVocalCad(c.funcao)) {
+        if (usadosVocal.has(id)) continue;
+        // Permite se já está em instrumento (vocal + instrumento ok)
+        c.membroId = m.id;
+        usadosVocal.add(id);
+        contagem[m.id] = (contagem[m.id] || 0) + 1;
+        break;
+      } else {
+        if (usadosInstrumento.has(id)) continue;
+        // Permite se já está só em vocal (não em outro instrumento)
+        c.membroId = m.id;
+        usadosInstrumento.add(id);
+        contagem[m.id] = (contagem[m.id] || 0) + 1;
+        break;
+      }
+    }
+  });
+
+  const membrosIds = [...new Set(escala.cadeiras.filter(c => c.membroId).map(c => c.membroId))];
+  escala.membros = membrosIds.map(id => ({ id, confirm: 'pendente' }));
+}
+
+function sugerirProximaEscala(escalaPublicada) {
+  const cultos = DB.get('cultos_regulares', []);
+  if (!cultos.length) return;
+
+  const dataAtual = new Date(escalaPublicada.data + 'T12:00:00');
+  const diaSemanaAtual = dataAtual.getDay();
+
+  // Encontra o próximo culto regular após esta data (dentro de 7 dias)
+  const escalasExistentes = DB.get('escalas', []).map(e => e.data);
+
+  // Ordena cultos por dia da semana a partir do dia seguinte
+  let proxData = null, proxCulto = null;
+  for (let d = 1; d <= 7; d++) {
+    const candidata = new Date(dataAtual);
+    candidata.setDate(dataAtual.getDate() + d);
+    const diaCandidato = candidata.getDay();
+    const cultosDia = cultos.filter(c => c.dia === diaCandidato);
+    if (cultosDia.length) {
+      const dataStr = candidata.toISOString().slice(0, 10);
+      if (!escalasExistentes.includes(dataStr)) {
+        proxData = dataStr;
+        proxCulto = cultosDia[0];
+        break;
+      }
+    }
+  }
+  if (!proxData) return;
+
+  const fmt = new Date(proxData + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const overlay = document.createElement('div');
+  overlay.id = 'prox-escala-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--r);padding:24px;width:min(360px,92vw);border:1px solid var(--border2);">
+      <h3 style="font-family:'Syne',sans-serif;font-size:16px;margin-bottom:8px;">Próximo culto</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px;">
+        Quer escalar também o próximo culto?<br>
+        <strong style="color:var(--text);">${proxCulto.nome} — ${fmt}</strong>
+      </p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-primary" onclick="iniciarEscalaOpcao('repetir','${proxData}','${proxCulto.nome}','${proxCulto.hora}')">
+          🔁 Repetir escala anterior
+        </button>
+        <button class="btn" style="background:var(--navy);color:var(--accent);" onclick="iniciarEscalaOpcao('auto','${proxData}','${proxCulto.nome}','${proxCulto.hora}')">
+          ✨ Escalar automaticamente
+        </button>
+        <button class="btn btn-ghost" onclick="iniciarEscalaOpcao('zero','${proxData}','${proxCulto.nome}','${proxCulto.hora}')">
+          📋 Escalar do zero
+        </button>
+        <button class="btn btn-ghost" style="color:var(--muted);font-size:12px;" onclick="document.getElementById('prox-escala-overlay').remove()">
+          Agora não
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function iniciarEscalaOpcao(modo, data, nomeCulto, hora) {
+  document.getElementById('prox-escala-overlay')?.remove();
+
+  const escalas = DB.get('escalas', []);
+  const escalaAnterior = escalas.find(x => x.id === currentEscalaId);
+
+  // Cria a nova escala no Supabase
+  let novaEscalaId;
+  if (supabase && MIN_ID) {
+    const { data: row, error } = await supabase.from('escalas').insert({
+      ministerio_id: MIN_ID, titulo: nomeCulto, data_evento: data,
+      hora_evento: hora + ':00', status: 'rascunho'
+    }).select().single();
+    if (error) { toast('❌ Erro ao criar escala: ' + error.message); return; }
+    novaEscalaId = row.id;
+  } else {
+    novaEscalaId = Date.now();
+  }
+
+  const funcoes = DB.get('ministerio_funcoes', FUNCOES_LISTA);
+  const novaEscala = {
+    id: novaEscalaId, titulo: nomeCulto, data, hora, status: 'rascunho', obs: '',
+    membros: [], slots: [], sugestoes: [],
+    cadeiras: funcoes.map(f => ({ funcao: f, membroId: null }))
+  };
+
+  if (modo === 'repetir' && escalaAnterior) {
+    // Copia cadeiras da escala anterior
+    novaEscala.cadeiras = (escalaAnterior.cadeiras || []).map(c => ({ funcao: c.funcao, membroId: c.membroId || null }));
+    const membrosIds = [...new Set(novaEscala.cadeiras.filter(c=>c.membroId).map(c=>c.membroId))];
+    novaEscala.membros = membrosIds.map(id => ({ id, confirm: 'pendente' }));
+    if (supabase) {
+      for (const mid of membrosIds) {
+        await supabase.from('escala_membros').upsert({ escala_id: novaEscalaId, membro_id: mid, confirmacao: 'pendente' }, { onConflict: 'escala_id,membro_id' });
+      }
+    }
+    toast('🔁 Escala copiada da anterior!');
+  } else if (modo === 'auto') {
+    escalarAutomatico(novaEscala);
+    toast('✨ Escala gerada automaticamente!');
+  }
+
+  escalas.push(novaEscala);
+  DB.set('escalas', escalas);
+  currentEscalaId = novaEscalaId;
+  navigate('escala-detail', novaEscalaId);
 }
 
 function notificarMembroEscalado(e, memId, membros) {
@@ -4871,6 +5065,10 @@ async function syncFromSupabase(membro) {
     // Chat
     const { data: chat } = await supabase.from('chat_mensagens').select('*, membros!autor_id(id, nome, iniciais, avatar_cor)').eq('ministerio_id', minId).order('criado_em').limit(50);
     if (chat) DB.set('chat', chat.map(adaptChat));
+
+    // Cultos regulares
+    const { data: cultos } = await supabase.from('cultos_regulares').select('*').eq('ministerio_id', minId).order('dia_semana');
+    if (cultos) DB.set('cultos_regulares', cultos.map(c => ({ id: c.id, nome: c.nome, dia: c.dia_semana, hora: c.hora, cor: c.cor || '#7c3aed' })));
 
     DB.set('seeded', true);
 
