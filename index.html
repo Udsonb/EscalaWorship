@@ -2372,17 +2372,24 @@ function abrirCadeiraPicker(idx) {
           if (!cadeiraAtualEVocal && estaEmInstrumento) conflito = true;
         }
 
-        const labelExtra = conflito
-          ? '<span style="font-size:10px;color:var(--red);margin-left:6px;">✕ conflito</span>'
-          : jaEscalado ? '<span style="font-size:10px;color:var(--accent);margin-left:6px;">✓ vocal+instrumento</span>' : '';
+        const isAtual = c.membroId && String(c.membroId) === String(m.id);
 
-        return `<div class="member-row" style="${indisp?'background:rgba(248,113,113,0.06);':''};${conflito?'opacity:.45;':''}">
-          <div class="avatar ${m.av}" style="${indisp?'border:2px solid var(--red);':''}">${m.iniciais}</div>
+        const labelExtra = isAtual
+          ? '<span style="font-size:10px;color:#22c55e;margin-left:6px;">✓ escalado aqui</span>'
+          : conflito
+            ? '<span style="font-size:10px;color:var(--red);margin-left:6px;">✕ conflito</span>'
+            : jaEscalado ? '<span style="font-size:10px;color:var(--accent);margin-left:6px;">✓ vocal+instrumento</span>' : '';
+
+        return `<div class="member-row" style="${isAtual?'background:rgba(34,197,94,0.07);':indisp?'background:rgba(248,113,113,0.06);':''};${conflito&&!isAtual?'opacity:.45;':''}">
+          <div class="avatar ${m.av}" style="${indisp&&!isAtual?'border:2px solid var(--red);':''}">${m.iniciais}</div>
           <div class="m-info" style="flex:1;">
             <div class="name">${m.nome}${labelExtra}</div>
             <div class="role">${indisp?'🚫 Indisponível nesta data':'✅ Disponível'}</div>
           </div>
-          ${conflito ? '<span class="tag tag-red" style="flex-shrink:0;">Conflito</span>'
+          ${isAtual
+            ? `<span class="tag" style="flex-shrink:0;background:#15803d;color:#fff;">✓ Atual</span>
+               <button class="btn btn-ghost btn-xs" style="flex-shrink:0;" onclick="atribuirMembroCadeira('${m.id}')">Trocar</button>`
+            : conflito ? '<span class="tag tag-red" style="flex-shrink:0;">Conflito</span>'
             : indisp
               ? `<span class="tag tag-red" style="flex-shrink:0;">🚫 Indisp.</span>
                  <button class="btn btn-ghost btn-xs" style="flex-shrink:0;" onclick="atribuirMembroCadeira('${m.id}')">Escalar mesmo</button>`
@@ -2434,8 +2441,53 @@ async function atribuirMembroCadeira(memIdRaw) {
   renderCadeiras();
   renderConfirmSummary();
 
-  closeModal('modal-cadeira-picker');
-  toast('✅ Membro escalado!');
+  // Atualiza modal sem fechar — re-renderiza a mesma cadeira
+  abrirCadeiraPicker(currentCadeiraIdx);
+
+  // Se todas as cadeiras estiverem preenchidas, mostra dialog de salvar
+  if (e.cadeiras.every(cc => cc.membroId)) {
+    closeModal('modal-cadeira-picker');
+    mostrarDialogSalvarEscala();
+  }
+}
+
+function mostrarDialogSalvarEscala() {
+  document.getElementById('salvar-escala-overlay')?.remove();
+  const el = document.createElement('div');
+  el.id = 'salvar-escala-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9997;display:flex;align-items:center;justify-content:center;';
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:28px 24px;width:min(340px,90vw);text-align:center;">
+      <div style="font-size:32px;margin-bottom:10px;">🎉</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:6px;">Todos escalados!</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:22px;">Salvar as atribuições ou cancelar?</div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button class="btn btn-ghost" onclick="cancelarEscalamento()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarEscalaFinal()">✅ Salvar Escala</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+}
+
+function salvarEscalaFinal() {
+  document.getElementById('salvar-escala-overlay')?.remove();
+  toast('✅ Escala salva!');
+}
+
+function cancelarEscalamento() {
+  if (!confirm('Remover todas as atribuições desta escala?')) return;
+  const escalas = DB.get('escalas', []);
+  const e = escalas.find(x => String(x.id) === String(currentEscalaId));
+  if (e) {
+    e.cadeiras.forEach(cc => { cc.membroId = null; });
+    e.membros = [];
+    DB.set('escalas', escalas);
+    if (supabase) supabase.from('escala_membros').delete().eq('escala_id', currentEscalaId).then(() => {});
+    renderCadeiras();
+    renderConfirmSummary();
+  }
+  document.getElementById('salvar-escala-overlay')?.remove();
+  toast('↩️ Escalamento cancelado');
 }
 
 function removerDaCadeira(idx) {
