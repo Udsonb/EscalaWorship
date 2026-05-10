@@ -1740,6 +1740,14 @@ const FUNCOES_LISTA = [
   '🎤 Vocal 1','🎤 Vocal 2','🎤 Vocal 3','🎤 Vocal 4 / Apoio'
 ];
 
+// Habilidades do membro (sem numeração de cadeira)
+const HABILIDADES_MEMBROS = [
+  '🎤 Vocal','🎹 Teclado','🎸 Guitarra','🎸 Baixo','🪗 Violão',
+  '🥁 Bateria','🪘 Percussão','🎺 Trompete','🎷 Saxofone',
+  '🎻 Violino','🪗 Acordeon','🎹 Órgão','🎙️ Ministro',
+  '🔊 Som / Técnico','📹 Transmissão','💡 Iluminação'
+];
+
 // ---- Seed inicial ----
 function seedData() {
   if (DB.get('seeded2')) return;
@@ -3737,14 +3745,6 @@ const TODAS_FUNCOES = [
   '🎤 Vocal 1','🎤 Vocal 2','🎤 Vocal 3','🎤 Vocal 4 / Apoio',
   '🎺 Trompete','🎷 Saxofone','🎻 Violino','🪗 Acordeon',
   '🔊 Som / Técnico','📹 Transmissão','💡 Iluminação','🎙️ Ministro','🎹 Órgão'
-];
-
-// Habilidades do membro — diferente das cadeiras da escala (sem numeração)
-const HABILIDADES_MEMBROS = [
-  '🎤 Vocal','🎹 Teclado','🎸 Guitarra','🎸 Baixo','🪗 Violão',
-  '🥁 Bateria','🪘 Percussão','🎺 Trompete','🎷 Saxofone',
-  '🎻 Violino','🪗 Acordeon','🎹 Órgão','🎙️ Ministro',
-  '🔊 Som / Técnico','📹 Transmissão','💡 Iluminação'
 ];
 
 function limparCacheLocal() {
