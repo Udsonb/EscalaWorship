@@ -2239,15 +2239,9 @@ function ensureCadeiras(e) {
     const m = membros.find(x => String(x.id) === String(me.id));
     if (!m) return;
     const fs = (m.funcoes && m.funcoes.length) ? m.funcoes : (m.funcao ? [m.funcao] : []);
-    fs.forEach(f => {
-      const c = e.cadeiras.find(cc => cc.funcao === f && !cc.membroId);
-      if (c) c.membroId = me.id;
-    });
-    // Fallback: assign to first empty cadeira if no function match found
-    if (!e.cadeiras.some(cc => String(cc.membroId) === String(me.id))) {
-      const c = e.cadeiras.find(cc => !cc.membroId);
-      if (c) c.membroId = me.id;
-    }
+    // Usa matchesCadeira para aceitar "Vocal" → "Vocal 1", "Vocal 2", etc.
+    const assigned = e.cadeiras.find(cc => !cc.membroId && matchesCadeira(fs, cc.funcao));
+    if (assigned) assigned.membroId = me.id;
   });
 }
 
@@ -2869,7 +2863,8 @@ async function salvarFuncoesMembro() {
   DB.set('membros', membros);
 
   if (supabase && MIN_ID) {
-    const { error } = await supabase.from('membros').update({ funcao: novasFuncoes[0] }).eq('id', editingMembroId);
+    const funcaoSalvar = novasFuncoes.length === 1 ? novasFuncoes[0] : JSON.stringify(novasFuncoes);
+    const { error } = await supabase.from('membros').update({ funcao: funcaoSalvar }).eq('id', editingMembroId);
     if (error) console.error('salvarFuncoes:', error);
   }
 
@@ -4889,9 +4884,15 @@ async function syncFromSupabase(membro) {
 
 // ---- Adapters: Supabase → formato local do app ----
 function adaptMembro(m) {
-  const funcao = m.funcao || '';
+  const raw = m.funcao || '';
+  let funcoes, funcao;
+  try {
+    const parsed = JSON.parse(raw);
+    funcoes = Array.isArray(parsed) ? parsed : [raw];
+  } catch { funcoes = raw ? [raw] : []; }
+  funcao = funcoes[0] || '';
   return { id: m.id, nome: m.nome, iniciais: m.iniciais || (m.nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase()),
-    av: m.avatar_cor || 'av1', funcao, funcoes: funcao ? [funcao] : [],
+    av: m.avatar_cor || 'av1', funcao, funcoes,
     email: m.email || '', tel: m.telefone || '',
     perm: m.permissao, status: m.status, indisps: [] };
 }
