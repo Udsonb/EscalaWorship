@@ -2391,9 +2391,9 @@ function abrirCadeiraPicker(idx) {
       }).join('')
     : `<div class="empty-state"><p>Nenhum membro cadastrado toca ${c.funcao}</p></div>`;
 
-  // Atualiza footer com botões de navegação entre cadeiras vazias
-  const proxIdx = e.cadeiras.findIndex((cc, i) => i > idx && !cc.membroId);
-  const pularIdx = proxIdx !== -1 ? e.cadeiras.findIndex((cc, i) => i > proxIdx && !cc.membroId) : -1;
+  // Atualiza footer com botões de navegação entre cadeiras
+  const proxIdx  = idx + 1 < e.cadeiras.length ? idx + 1 : -1;
+  const pularIdx = idx + 2 < e.cadeiras.length ? idx + 2 : -1;
   document.getElementById('modal-cadeira-footer').innerHTML =
     `<button class="btn btn-ghost" onclick="closeModal('modal-cadeira-picker')">Fechar</button>` +
     (pularIdx !== -1 ? `<button class="btn btn-ghost" onclick="closeModal('modal-cadeira-picker');abrirCadeiraPicker(${pularIdx})">Pular</button>` : '') +
