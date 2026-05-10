@@ -2817,10 +2817,12 @@ function abrirEditarFuncoesMembro() {
   const m = membros.find(x => String(x.id) === String(editingMembroId));
   if (!m) return;
   const atuais = memberFuncoes(m).filter(f => f !== '—');
-  const disponiveis = DB.get('ministerio_funcoes', FUNCOES_LISTA).concat(
-    TODAS_FUNCOES.filter(f => !DB.get('ministerio_funcoes', FUNCOES_LISTA).includes(f))
-  );
-  const uniqueFuncoes = [...new Set([...DB.get('ministerio_funcoes', FUNCOES_LISTA), ...TODAS_FUNCOES])];
+  // Normaliza habilidades atuais: "Vocal 1" → "Vocal", etc., para pré-marcar corretamente
+  const atuaisNorm = atuais.map(f => {
+    const match = HABILIDADES_MEMBROS.find(h => normFuncao(h) === normFuncao(f) || normFuncao(f).startsWith(normFuncao(h)));
+    return match || f;
+  });
+  const uniqueFuncoes = HABILIDADES_MEMBROS;
 
   const overlay = document.createElement('div');
   overlay.id = 'editar-funcoes-overlay';
@@ -2833,7 +2835,7 @@ function abrirEditarFuncoesMembro() {
       <div style="display:flex;flex-direction:column;gap:8px;" id="efm-lista">
         ${uniqueFuncoes.map(f => `
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 8px;border-radius:8px;background:var(--surface2);">
-            <input type="checkbox" value="${f}" ${atuais.includes(f)?'checked':''} style="width:16px;height:16px;accent-color:var(--accent);">
+            <input type="checkbox" value="${f}" ${atuaisNorm.includes(f)?'checked':''} style="width:16px;height:16px;accent-color:var(--accent);">
             <span style="font-size:13px;">${f}</span>
           </label>`).join('')}
       </div>
@@ -3735,6 +3737,14 @@ const TODAS_FUNCOES = [
   '🎤 Vocal 1','🎤 Vocal 2','🎤 Vocal 3','🎤 Vocal 4 / Apoio',
   '🎺 Trompete','🎷 Saxofone','🎻 Violino','🪗 Acordeon',
   '🔊 Som / Técnico','📹 Transmissão','💡 Iluminação','🎙️ Ministro','🎹 Órgão'
+];
+
+// Habilidades do membro — diferente das cadeiras da escala (sem numeração)
+const HABILIDADES_MEMBROS = [
+  '🎤 Vocal','🎹 Teclado','🎸 Guitarra','🎸 Baixo','🪗 Violão',
+  '🥁 Bateria','🪘 Percussão','🎺 Trompete','🎷 Saxofone',
+  '🎻 Violino','🪗 Acordeon','🎹 Órgão','🎙️ Ministro',
+  '🔊 Som / Técnico','📹 Transmissão','💡 Iluminação'
 ];
 
 function limparCacheLocal() {
