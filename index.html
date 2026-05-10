@@ -2259,9 +2259,9 @@ function renderCadeiras() {
   document.getElementById('esc-membros').innerHTML =
     `<div style="font-size:11px;color:var(--muted);padding:8px 0 4px;font-weight:600;">${preenchidas}/${total} cadeiras preenchidas</div>` +
     e.cadeiras.map((c, idx) => {
-      const m = c.membroId ? membros.find(x=>x.id===c.membroId) : null;
+      const m = c.membroId ? membros.find(x=>String(x.id)===String(c.membroId)) : null;
       const indisp = m ? isIndisponivel(m, e.data) : false;
-      const me = m ? e.membros.find(x=>x.id===m.id) : null;
+      const me = m ? e.membros.find(x=>String(x.id)===String(m.id)) : null;
       if (m) {
         return `<div class="member-row" style="padding:9px 0;border-bottom:1px solid var(--border);${indisp?'background:rgba(248,113,113,0.05);':''}">
           <div class="avatar ${m.av}" style="width:34px;height:34px;font-size:11px;flex-shrink:0;${indisp?'border:2px solid var(--red);':''}">${m.iniciais}</div>
@@ -2400,7 +2400,7 @@ async function atribuirMembroCadeira(memIdRaw) {
   const memId = m.id;
 
   const escalas = DB.get('escalas',[]);
-  const e = escalas.find(x=>x.id===currentEscalaId);
+  const e = escalas.find(x=>String(x.id)===String(currentEscalaId));
   const c = e.cadeiras[currentCadeiraIdx];
   const prevId = c.membroId;
 
@@ -2427,7 +2427,9 @@ async function atribuirMembroCadeira(memIdRaw) {
 
   closeModal('modal-cadeira-picker');
   toast('✅ Membro escalado!');
-  mostrarOpcoesProximaCadeira(e, currentCadeiraIdx);
+  // Re-lê do DB para garantir estado atualizado
+  const escalaAtual = DB.get('escalas',[]).find(x=>String(x.id)===String(currentEscalaId));
+  if (escalaAtual) mostrarOpcoesProximaCadeira(escalaAtual, currentCadeiraIdx);
 }
 
 function mostrarOpcoesProximaCadeira(e, idxAtual) {
