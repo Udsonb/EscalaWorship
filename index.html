@@ -2240,15 +2240,17 @@ function ensureCadeiras(e) {
     const m = membros.find(x => String(x.id) === String(me.id));
     if (!m) return;
     const fs = (m.funcoes && m.funcoes.length) ? m.funcoes : (m.funcao ? [m.funcao] : []);
-    // Usa matchesCadeira para aceitar "Vocal" → "Vocal 1", "Vocal 2", etc.
-    const assigned = e.cadeiras.find(cc => !cc.membroId && matchesCadeira(fs, cc.funcao));
-    if (assigned) assigned.membroId = me.id;
+    // Atribui uma cadeira por habilidade: Flávio (Vocal+Teclado) → Vocal 1 + Teclado
+    fs.forEach(funcao => {
+      const assigned = e.cadeiras.find(cc => !cc.membroId && matchesCadeira([funcao], cc.funcao));
+      if (assigned) assigned.membroId = me.id;
+    });
   });
 }
 
 function renderCadeiras() {
   const escalas = DB.get('escalas',[]);
-  const e = escalas.find(x=>x.id===currentEscalaId);
+  const e = escalas.find(x=>String(x.id)===String(currentEscalaId));
   if (!e) return;
   ensureCadeiras(e);
   DB.set('escalas', escalas);
