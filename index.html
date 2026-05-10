@@ -2732,7 +2732,7 @@ function renderMembros() {
     const funcoes = memberFuncoes(m);
     const isVocal = funcoes.some(f=>f.includes('Vocal'));
     const alert = isVocal ? memberFreqAlert(m.id) : '';
-    return `<div class="member-row" style="cursor:pointer;" onclick="navigate('membro-detail',${m.id})">
+    return `<div class="member-row" style="cursor:pointer;" onclick="navigate('membro-detail','${m.id}')">
       <div class="avatar ${m.av}">${m.iniciais}</div>
       <div class="m-info">
         <div class="name">${m.nome}</div>
@@ -2761,28 +2761,127 @@ function memberFreqAlert(membroId) {
 
 function renderMembroDetail(id) {
   const membros = DB.get('membros',[]);
-  const m = membros.find(x=>x.id===id);
+  const m = membros.find(x => String(x.id) === String(id));
   if (!m) return;
   editingMembroId = id;
 
+  const isAdmin = ME.perm === 'admin';
+  const isSelf  = String(m.id) === String(ME.id);
+  const canEditFuncoes = isAdmin || isSelf;
+
   document.getElementById('md-name').textContent = m.nome;
   const funcoes = memberFuncoes(m);
+
+  const permLabels = { participante: '👤 Participante', editor: '✏️ Editor', admin: '⭐ Admin' };
+
+  // Permissão: admin pode alterar de outros; não pode rebaixar a si mesmo se for o único admin
+  const adminsCount = membros.filter(x => x.perm === 'admin').length;
+  const canEditPerm = isAdmin && !isSelf;
+  const permHtml = canEditPerm
+    ? `<select class="form-select" style="font-size:12px;padding:4px 8px;height:auto;" onchange="salvarPermissaoMembro(this.value)">
+        <option value="participante" ${m.perm==='participante'?'selected':''}>👤 Participante</option>
+        <option value="editor"       ${m.perm==='editor'      ?'selected':''}>✏️ Editor</option>
+        <option value="admin"        ${m.perm==='admin'       ?'selected':''}>⭐ Admin</option>
+       </select>`
+    : `<div style="font-size:13px;">${permLabels[m.perm] || m.perm}</div>`;
+
   document.getElementById('md-info').innerHTML = `
-    <div class="member-row">
-      <div class="avatar ${m.av}" style="width:56px;height:56px;font-size:20px;">${m.iniciais}</div>
-      <div class="m-info">
+    <div class="member-row" style="align-items:flex-start;">
+      <div class="avatar ${m.av}" style="width:56px;height:56px;font-size:20px;flex-shrink:0;">${m.iniciais}</div>
+      <div class="m-info" style="flex:1;">
         <div class="name" style="font-size:16px;">${m.nome}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;">${funcoes.map(f=>`<span class="tag tag-purple" style="font-size:11px;">${f}</span>`).join('')}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${funcoes.map(f=>`<span class="tag tag-purple" style="font-size:11px;">${f}</span>`).join('')}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">${m.email||''}</div>
       </div>
     </div>
+    ${canEditFuncoes ? `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:10px;" onclick="abrirEditarFuncoesMembro()">✏️ Editar Funções / Habilidades</button>` : ''}
     <div class="divider"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;">
       <div><div class="form-label">Telefone</div><div style="font-size:13px;">${m.tel||'—'}</div></div>
-      <div><div class="form-label">Permissão</div><div style="font-size:13px;">${m.perm}</div></div>
+      <div><div class="form-label">Permissão</div>${permHtml}</div>
     </div>`;
 
   renderIndisps(m);
+}
+
+function abrirEditarFuncoesMembro() {
+  const membros = DB.get('membros',[]);
+  const m = membros.find(x => String(x.id) === String(editingMembroId));
+  if (!m) return;
+  const atuais = memberFuncoes(m).filter(f => f !== '—');
+  const disponiveis = DB.get('ministerio_funcoes', FUNCOES_LISTA).concat(
+    TODAS_FUNCOES.filter(f => !DB.get('ministerio_funcoes', FUNCOES_LISTA).includes(f))
+  );
+  const uniqueFuncoes = [...new Set([...DB.get('ministerio_funcoes', FUNCOES_LISTA), ...TODAS_FUNCOES])];
+
+  const overlay = document.createElement('div');
+  overlay.id = 'editar-funcoes-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--r);padding:20px;width:min(340px,92vw);max-height:80vh;overflow-y:auto;">
+      <h3 style="font-family:'Syne',sans-serif;font-size:16px;margin-bottom:4px;">Funções / Habilidades</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Selecione todas que se aplicam</p>
+      <div style="display:flex;flex-direction:column;gap:8px;" id="efm-lista">
+        ${uniqueFuncoes.map(f => `
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 8px;border-radius:8px;background:var(--surface2);">
+            <input type="checkbox" value="${f}" ${atuais.includes(f)?'checked':''} style="width:16px;height:16px;accent-color:var(--accent);">
+            <span style="font-size:13px;">${f}</span>
+          </label>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="document.getElementById('editar-funcoes-overlay').remove()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" style="flex:1;" onclick="salvarFuncoesMembro()">Salvar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function salvarFuncoesMembro() {
+  const checks = document.querySelectorAll('#efm-lista input[type=checkbox]:checked');
+  const novasFuncoes = Array.from(checks).map(c => c.value);
+  if (!novasFuncoes.length) { toast('⚠️ Selecione ao menos uma função'); return; }
+
+  const membros = DB.get('membros',[]);
+  const m = membros.find(x => String(x.id) === String(editingMembroId));
+  if (!m) return;
+
+  m.funcoes = novasFuncoes;
+  m.funcao  = novasFuncoes[0];
+  DB.set('membros', membros);
+
+  if (supabase && MIN_ID) {
+    const { error } = await supabase.from('membros').update({ funcao: novasFuncoes[0] }).eq('id', editingMembroId);
+    if (error) console.error('salvarFuncoes:', error);
+  }
+
+  document.getElementById('editar-funcoes-overlay')?.remove();
+  renderMembroDetail(editingMembroId);
+  toast('✅ Funções atualizadas');
+}
+
+async function salvarPermissaoMembro(novaPerm) {
+  const membros = DB.get('membros',[]);
+  const m = membros.find(x => String(x.id) === String(editingMembroId));
+  if (!m) return;
+
+  // Não rebaixar o último admin
+  if (m.perm === 'admin' && novaPerm !== 'admin') {
+    const totalAdmins = membros.filter(x => x.perm === 'admin').length;
+    if (totalAdmins <= 1) { toast('⚠️ O ministério precisa ter ao menos um admin'); renderMembroDetail(editingMembroId); return; }
+  }
+
+  m.perm = novaPerm;
+  DB.set('membros', membros);
+
+  if (supabase && MIN_ID) {
+    const { error } = await supabase.from('membros').update({ permissao: novaPerm }).eq('id', editingMembroId);
+    if (error) { console.error('salvarPermissao:', error); toast('❌ Erro ao salvar permissão'); return; }
+  }
+
+  renderMembroDetail(editingMembroId);
+  renderMembros();
+  toast('✅ Permissão atualizada');
 }
 
 function renderIndisps(m) {
