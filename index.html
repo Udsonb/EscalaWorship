@@ -2240,11 +2240,8 @@ function ensureCadeiras(e) {
     const m = membros.find(x => String(x.id) === String(me.id));
     if (!m) return;
     const fs = (m.funcoes && m.funcoes.length) ? m.funcoes : (m.funcao ? [m.funcao] : []);
-    // Atribui uma cadeira por habilidade: Flávio (Vocal+Teclado) → Vocal 1 + Teclado
-    fs.forEach(funcao => {
-      const assigned = e.cadeiras.find(cc => !cc.membroId && matchesCadeira([funcao], cc.funcao));
-      if (assigned) assigned.membroId = me.id;
-    });
+    const assigned = e.cadeiras.find(cc => !cc.membroId && matchesCadeira(fs, cc.funcao));
+    if (assigned) assigned.membroId = me.id;
   });
 }
 
@@ -2440,6 +2437,7 @@ async function atribuirMembroCadeira(memIdRaw) {
 
   DB.set('escalas', escalas);
   if (isNew) notificarMembroEscalado(e, memId, membros);
+  salvarCadeirasSupabase(currentEscalaId, e.cadeiras);
   renderCadeiras();
   renderConfirmSummary();
 
@@ -2492,6 +2490,13 @@ function cancelarEscalamento() {
   toast('↩️ Escalamento cancelado');
 }
 
+function salvarCadeirasSupabase(escalaId, cadeiras) {
+  if (!supabase) return;
+  supabase.from('escalas').update({ cadeiras_json: JSON.stringify(cadeiras) })
+    .eq('id', escalaId)
+    .then(({ error }) => { if (error) console.error('cadeiras_json save:', error); });
+}
+
 function removerDaCadeira(idx) {
   const escalas = DB.get('escalas',[]);
   const e = escalas.find(x=>x.id===currentEscalaId);
@@ -2503,6 +2508,7 @@ function removerDaCadeira(idx) {
     if (supabase) supabase.from('escala_membros').delete().eq('escala_id', currentEscalaId).eq('membro_id', memId).then(({error}) => { if (error) console.error('escala_membros delete:', error); });
   }
   DB.set('escalas', escalas);
+  salvarCadeirasSupabase(currentEscalaId, e.cadeiras);
   renderCadeiras();
   renderConfirmSummary();
   toast('Cadeira liberada');
@@ -5151,10 +5157,13 @@ function adaptMembro(m) {
 }
 
 function adaptEscala(e) {
+  let cadeiras = null;
+  if (e.cadeiras_json) { try { cadeiras = JSON.parse(e.cadeiras_json); } catch {} }
   return {
     id: e.id, titulo: e.titulo,
     data: e.data_evento, hora: e.hora_evento?.slice(0,5),
     status: e.status, obs: e.observacoes || '',
+    cadeiras,
     membros: (e.escala_membros || []).map(em => ({ id: em.membro_id, confirm: em.confirmacao })),
     slots: (e.escala_slots || []).sort((a,b)=>a.posicao-b.posicao).map(s => ({
       pos: s.posicao, nome: s.nome || '', artista: s.artista || '',
