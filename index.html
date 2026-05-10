@@ -2728,21 +2728,29 @@ function renderMembros() {
 
   document.getElementById('membros-count').textContent = `Membros (${filtrado.length})`;
 
-  document.getElementById('membros-list').innerHTML = filtrado.map(m => {
+  const lista = document.getElementById('membros-list');
+  lista.innerHTML = filtrado.map(m => {
     const funcoes = memberFuncoes(m);
     const isVocal = funcoes.some(f=>f.includes('Vocal'));
     const alert = isVocal ? memberFreqAlert(m.id) : '';
-    return `<div class="member-row" style="cursor:pointer;" onclick="navigate('membro-detail','${m.id}')">
-      <div class="avatar ${m.av}">${m.iniciais}</div>
-      <div class="m-info">
+    return `<div class="member-row" style="cursor:pointer;" data-mid="${m.id}">
+      <div class="avatar ${m.av}" style="pointer-events:none;">${m.iniciais}</div>
+      <div class="m-info" style="pointer-events:none;">
         <div class="name">${m.nome}</div>
         <div class="role" style="display:flex;flex-wrap:wrap;gap:3px;">${funcoes.map(f=>`<span style="font-size:10.5px;background:var(--surface2);padding:1px 6px;border-radius:5px;">${f}</span>`).join('')}</div>
       </div>
-      ${alert}
-      ${m.status==='indisponivel'?'<span class="tag tag-red">🚫 Indisp.</span>':'<span class="tag tag-green">Ativo</span>'}
-      ${m.perm==='admin'?'<span class="tag tag-gold" style="font-size:10px;">Admin</span>':''}
+      <div style="pointer-events:none;display:flex;gap:4px;align-items:center;">
+        ${alert}
+        ${m.status==='indisponivel'?'<span class="tag tag-red">🚫 Indisp.</span>':'<span class="tag tag-green">Ativo</span>'}
+        ${m.perm==='admin'?'<span class="tag tag-gold" style="font-size:10px;">Admin</span>':''}
+      </div>
     </div>`;
   }).join('');
+
+  lista.onclick = e => {
+    const row = e.target.closest('[data-mid]');
+    if (row) navigate('membro-detail', row.dataset.mid);
+  };
 }
 
 function memberFuncoes(m) {
