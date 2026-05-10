@@ -1641,7 +1641,7 @@ body {
       <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-cadeira-picker')">✕</button>
     </div>
     <div class="modal-body" id="modal-cadeira-list"></div>
-    <div class="modal-footer">
+    <div class="modal-footer" id="modal-cadeira-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-cadeira-picker')">Fechar</button>
     </div>
   </div>
@@ -2390,6 +2390,14 @@ function abrirCadeiraPicker(idx) {
       }).join('')
     : `<div class="empty-state"><p>Nenhum membro cadastrado toca ${c.funcao}</p></div>`;
 
+  // Atualiza footer com botões de navegação entre cadeiras vazias
+  const proxIdx = e.cadeiras.findIndex((cc, i) => i > idx && !cc.membroId);
+  const pularIdx = proxIdx !== -1 ? e.cadeiras.findIndex((cc, i) => i > proxIdx && !cc.membroId) : -1;
+  document.getElementById('modal-cadeira-footer').innerHTML =
+    `<button class="btn btn-ghost" onclick="closeModal('modal-cadeira-picker')">Fechar</button>` +
+    (pularIdx !== -1 ? `<button class="btn btn-ghost" onclick="closeModal('modal-cadeira-picker');abrirCadeiraPicker(${pularIdx})">Pular</button>` : '') +
+    (proxIdx !== -1 ? `<button class="btn btn-primary" onclick="closeModal('modal-cadeira-picker');abrirCadeiraPicker(${proxIdx})">Próximo →</button>` : '');
+
   openModal('modal-cadeira-picker');
 }
 
@@ -2427,38 +2435,6 @@ async function atribuirMembroCadeira(memIdRaw) {
 
   closeModal('modal-cadeira-picker');
   toast('✅ Membro escalado!');
-  // Re-lê do DB para garantir estado atualizado
-  const escalaAtual = DB.get('escalas',[]).find(x=>String(x.id)===String(currentEscalaId));
-  if (escalaAtual) mostrarOpcoesProximaCadeira(escalaAtual, currentCadeiraIdx);
-}
-
-function mostrarOpcoesProximaCadeira(e, idxAtual) {
-  const proxIdx = e.cadeiras.findIndex((cc, i) => i > idxAtual && !cc.membroId);
-  if (proxIdx === -1) return; // sem mais cadeiras vazias
-
-  const proxCad = e.cadeiras[proxIdx];
-  const temCandidatos = DB.get('membros', []).some(m => m.status !== 'inativo' && matchesCadeira(memberFuncoes(m), proxCad.funcao));
-
-  // Se não há ninguém para a próxima cadeira, tenta a seguinte
-  if (!temCandidatos) {
-    mostrarOpcoesProximaCadeira(e, proxIdx);
-    return;
-  }
-
-  const overlay = document.createElement('div');
-  overlay.id = 'prox-cadeira-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;display:flex;align-items:flex-end;justify-content:center;padding-bottom:24px;';
-  overlay.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:16px 20px;width:min(380px,92vw);display:flex;align-items:center;gap:12px;">
-      <div style="flex:1;">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Próxima cadeira vazia</div>
-        <div style="font-size:14px;font-weight:600;">${proxCad.funcao}</div>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('prox-cadeira-overlay').remove()">Fechar</button>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('prox-cadeira-overlay').remove();mostrarOpcoesProximaCadeira(DB.get('escalas',[]).find(x=>x.id===currentEscalaId),${proxIdx})">Pular</button>
-      <button class="btn btn-primary btn-sm" onclick="document.getElementById('prox-cadeira-overlay').remove();abrirCadeiraPicker(${proxIdx})">Próximo →</button>
-    </div>`;
-  document.body.appendChild(overlay);
 }
 
 function removerDaCadeira(idx) {
